@@ -145,7 +145,8 @@ function buildServer(client: string) {
   server.registerTool("search_thoughts", {
     description:
       "Hybrid search over saved thoughts: meaning (semantic) plus exact words (keyword), fused. Use recency (0 to 1) to favor newer " +
-      "memories, e.g. 0.2 for a nudge or 0.7 for 'this week'. Notes marked superseded were replaced by a later note and rank lower. " +
+      "memories, e.g. 0.2 for a nudge or 0.7 for 'this week'. Notes marked superseded were replaced by a later note, and notes marked " +
+      "disputed contradict a correction (often a stale fact saved again); both rank lower and the current version or the correction is shown next to them. " +
       "Restricted (secret-like) memories are hidden unless include_restricted is true." + DATA_NOTE,
     inputSchema: searchIn,
   }, async ({ query, limit, recency, half_life_days, tag, source, include_restricted }: z.infer<typeof searchIn>) => {
@@ -185,8 +186,31 @@ function buildServer(client: string) {
       }
     }
 
+    // A disputed note contradicts a Correction (usually a stale fact that was re-saved). Show that correction next to it.
+    // deno-lint-ignore no-explicit-any
+    const correctionFor = new Map<string, any[]>();
+    const disputedIds = found.filter((r) => r.disputed).map((r) => r.id);
+    if (disputedIds.length) {
+      const { data: dl } = await supabase.from("thought_links").select("from_id,to_id").eq("kind", "contradicts").in("from_id", disputedIds);
+      const wanted = [...new Set((dl ?? []).map((l) => l.to_id))];
+      if (wanted.length) {
+        const { data: corr } = await supabase.from("thoughts")
+          .select("id,content,summary,source,type,importance,sensitivity_tier,tags,topic,created_at")
+          .in("id", wanted).is("merged_into", null).is("retracted_at", null).ilike("content", "correction%").neq("sensitivity_tier", "restricted");
+        const byId = new Map((corr ?? []).map((c) => [c.id, c]));
+        for (const l of dl ?? []) {
+          const c = byId.get(l.to_id);
+          if (c) correctionFor.set(l.from_id, [...(correctionFor.get(l.from_id) ?? []), c]);
+        }
+      }
+    }
+
     // Attach connections found by Dreaming so the agent can follow them.
-    const ids = [...new Set([...found.map((r) => r.id), ...[...newerFor.values()].flat().map((n) => n.id)])];
+    const ids = [...new Set([
+      ...found.map((r) => r.id),
+      ...[...newerFor.values()].flat().map((n) => n.id),
+      ...[...correctionFor.values()].flat().map((n) => n.id),
+    ])];
     const { data: links } = ids.length
       ? await supabase.from("thought_links").select("from_id,to_id,kind,reason")
         .or(`from_id.in.(${ids.join(",")}),to_id.in.(${ids.join(",")})`).neq("kind", "duplicate").limit(150)
@@ -194,13 +218,23 @@ function buildServer(client: string) {
     // deno-lint-ignore no-explicit-any
     const withLinks = (r: any) => ({ ...r, links: (links ?? []).filter((l) => l.from_id === r.id || l.to_id === r.id) });
 
-    const emitted = new Set<string>(found.map((r) => r.id));
+    const inFound = new Set<string>(found.map((r) => r.id));
+    const emitted = new Set<string>();
     // deno-lint-ignore no-explicit-any
     const out: any[] = [];
     for (const r of found) {
+      if (emitted.has(r.id)) continue; // already shown early, as the correction for a disputed note
+      // A disputed note is shown AFTER the correction it contradicts, so an agent reading top-down meets the truth first,
+      // even when the correction ranked lower on its own.
+      for (const c of (correctionFor.get(r.id) ?? []).slice(0, 2)) {
+        if (emitted.has(c.id)) continue;
+        emitted.add(c.id);
+        out.push({ ...withLinks(c), note: "Correction that the next note contradicts: that note is disputed, so treat this correction as authoritative." });
+      }
+      emitted.add(r.id);
       out.push(withLinks(r));
       for (const n of (newerFor.get(r.id) ?? []).slice(0, 2)) {
-        if (emitted.has(n.id)) continue;
+        if (emitted.has(n.id) || inFound.has(n.id)) continue;
         emitted.add(n.id);
         out.push({ ...withLinks(n), note: "Newer note that supersedes the one above: treat this as the current version." });
       }

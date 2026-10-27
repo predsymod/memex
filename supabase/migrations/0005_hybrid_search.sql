@@ -27,7 +27,7 @@ create function search_memex(
 ) returns table (
   id uuid, content text, summary text, source text, type text, importance smallint, sensitivity_tier text,
   tags text[], topic text, created_at timestamptz,
-  similarity float, keyword_hit boolean, superseded boolean, score float
+  similarity float, keyword_hit boolean, superseded boolean, disputed boolean, score float
 )
 language sql stable as $$
   with params as (
@@ -65,19 +65,29 @@ language sql stable as $$
               else 1 - (t.embedding <=> query_embedding) end as similarity,
          f.keyword_hit,
          sup.is_superseded as superseded,
+         sup.is_disputed as disputed,
          f.rrf
            * (case when t.source = 'dream'
                    then (1 - p.w)  -- digests get no recency boost: they are always new but never the specific answer
                    else (1 - p.w) + p.w * power(0.5, greatest(extract(epoch from (now() - t.created_at)) / 86400.0, 0) / p.hl)
               end)
            * (case when sup.is_superseded then 0.5 else 1 end)   -- replaced by a later note: stale
+           * (case when sup.is_disputed then 0.5 else 1 end)     -- contradicts a Correction: probably a stale fact re-asserted
            * (case when t.source = 'dream' then 0.7 else 1 end)  -- auto-written digests are broad and match everything weakly
            as score
   from fused f
   join thoughts t on t.id = f.id
   cross join params p
   cross join lateral (
-    select exists (select 1 from thought_links l where l.to_id = t.id and l.kind = 'supersedes') as is_superseded
+    select
+      exists (select 1 from thought_links l where l.to_id = t.id and l.kind = 'supersedes') as is_superseded,
+      -- "Disputed": this note is on the contradicting side of a link to a note that begins "Correction". An agent that
+      -- re-saves a fact the user already corrected (easy to do unattended) lands here: it stays searchable, ranks
+      -- lower, is flagged, and the correction it contradicts is shown next to it.
+      exists (
+        select 1 from thought_links l join thoughts c on c.id = l.to_id
+        where l.from_id = t.id and l.kind = 'contradicts' and c.retracted_at is null and c.content ilike 'correction%'
+      ) as is_disputed
   ) sup
   order by score desc
   limit match_count;

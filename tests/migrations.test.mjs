@@ -79,6 +79,18 @@ console.log('\n=== A. Fresh install on an empty database');
     const s5 = await q(db, 'select content, superseded, score from search_memex($1, $2::vector, 10, 0.3)', ['quokkas', vec(0)]);
     const a = s5.find((r) => r.content.startsWith('Alpha')), b = s5.find((r) => r.content.startsWith('Beta'));
     check('older note flagged superseded and ranked below the newer', a?.superseded === true && b?.superseded === false && a.score < b.score, JSON.stringify(s5.map((r) => [r.content.slice(0, 5), r.superseded, r.score])));
+    // disputed: a note that contradicts a note beginning "Correction" is flagged and ranks below an untouched note
+    await db.query("insert into thoughts (content, embedding, source) values ('Correction: quokkas are marsupials, not rodents', $1, 'claude')", [vec(0)]);
+    await db.query("insert into thoughts (content, embedding, source) values ('Quokkas are rodents and eat nuts', $1, 'claude')", [vec(0)]);
+    const cid = (await q(db, "select id from thoughts where content like 'Correction: quokkas%'"))[0].id;
+    const sid = (await q(db, "select id from thoughts where content like 'Quokkas are rodents%'"))[0].id;
+    await db.query("insert into thought_links (from_id, to_id, kind) values ($1, $2, 'contradicts')", [sid, cid]);
+    const ds = await q(db, 'select content, disputed, score from search_memex($1, $2::vector, 10, 0.3)', ['quokkas', vec(0)]);
+    const stale = ds.find((r) => r.content.startsWith('Quokkas are rodents')), corr = ds.find((r) => r.content.startsWith('Correction: quokkas'));
+    check('note contradicting a Correction is flagged disputed and ranks below it', stale?.disputed === true && corr?.disputed === false && stale.score < corr.score, JSON.stringify(ds.map((r) => [r.content.slice(0, 12), r.disputed, r.score])));
+    check('a note that is not disputed is not flagged', ds.filter((r) => r.disputed).length === 1);
+    await db.query('delete from thoughts where id in ($1, $2)', [cid, sid]);
+
     // merged_into hides
     await db.query('update thoughts set merged_into = $1 where id = $2', [ids['Beta '], ids['The z']]);
     const s6 = await q(db, 'select * from search_memex($1, null::vector, 10, 0.3)', ['zebra']);
