@@ -185,7 +185,7 @@ async function enrich(batch: Row[], run_id: string, log: Log): Promise<{ n: numb
     // Everything the model returns is cleaned and capped before it is stored.
     const list = (x: unknown, max: number, len: number) => (Array.isArray(x) ? x : []).slice(0, max).map((s) => clean(s, len)).filter(Boolean);
     const added = list(v.tags, 5, 40).map((t) => t.toLowerCase());
-    // Add to existing tags instead of replacing them, normalizing case so "VerbaGPT" and "verbagpt" don't both stay.
+    // Add to existing tags instead of replacing them, normalizing case so "Quokka" and "quokka" don't both stay.
     const tags = [...new Set([...(row.tags ?? []).map((t) => t.toLowerCase()), ...added])].slice(0, MAX_TAGS);
     const dates = (Array.isArray(v.dates) ? v.dates : []).slice(0, 10)
       .map((d: { text?: unknown; date?: unknown }) => ({ text: clean(d?.text, 60), date: clean(d?.date, 10) }))
