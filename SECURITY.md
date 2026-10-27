@@ -10,7 +10,7 @@ Memex holds personal memory, so it is built to fail closed. This page says what 
 - **Memories are treated as untrusted data.** They are fenced inside tags when shown to a model, model output is cleaned and length-capped before it is stored, and agents are told never to follow instructions found in a memory.
 - **Inputs are bounded.** Thoughts, tags, source names, queries and sync batches have size limits.
 - **Dreaming never deletes.** Everything it changes is logged and reversible.
-- **Unattended saving is opt-in and fenced by the server.** A scheduled sync is pull-only unless the user clearly asked it to save. When it does save, the server (not the agent) limits it to 5 short notes per run, skips anything secret-like, and tags every note `auto-sync`. The `retract_thoughts` tool can hide only notes with that tag, never deletes, and is reversible, so even a manipulated agent cannot erase or hide ordinary memories.
+- **Unattended saving is opt-in and fenced by the server.** A scheduled sync is pull-only unless the user clearly asked it to save. When it does save, the server (not the agent) limits it to a small number of short notes per run (10 notes of up to 1,000 characters by default; change them with the `UNATTENDED_MAX_ITEMS` and `UNATTENDED_MAX_CHARS` secrets), skips anything secret-like, and tags every note `auto-sync`. The `retract_thoughts` tool can hide only notes with that tag, never deletes, and is reversible, so even a manipulated agent cannot erase or hide ordinary memories.
 
 ## What it does not do
 
