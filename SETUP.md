@@ -7,6 +7,7 @@ The user asked you to set up Memex, a personal memory they own and any agent can
 - Never print, log or commit secrets. Show the access key to the user once so they can save it, then don't repeat it.
 - Never put a secret in a command you show back, a file in the repo, or an issue report. Use environment variables or the gitignored `.env`.
 - Prefer the `x-brain-key` header for the key. Use `?key=` in a URL only for a client that can't send headers (see step 8).
+- Never ask the user to paste the key or a URL containing it into the chat: the chat goes to a model provider. Have them set an environment variable themselves and reference it (for example `{env:MEMEX_KEY}` in opencode).
 - If you cannot run shell commands, give the user the exact commands and ask them to run them.
 - On Windows PowerShell, use `npx.cmd supabase ...` if `npx supabase` is blocked by the execution policy. Do not change system security settings.
 
@@ -54,6 +55,7 @@ The server URL is `https://<PROJECT_REF>.supabase.co/functions/v1/memex-mcp`.
 ## 8. Connect this agent and any others
 - Claude Code: `claude mcp add --transport http memex <URL> --header "x-brain-key: <KEY>"`
 - Other agents: add an MCP server of type HTTP with that URL and the `x-brain-key` header.
+- opencode: in `opencode.json`, `"mcp": {"memex": {"type": "remote", "url": "{env:MEMEX_URL}", "headers": {"x-brain-key": "{env:MEMEX_KEY}"}, "enabled": true}}`. The user sets `MEMEX_URL` and `MEMEX_KEY` in their own terminal and restarts opencode.
 - Clients that only take a URL (such as claude.ai custom connectors): use `<URL>?key=<KEY>` and set `ALLOW_URL_KEY=true` in step 6.
 - Give each tool its own copy of the key; there is no per-tool setup on the server.
 
