@@ -20,6 +20,9 @@ alter table thoughts add column if not exists tags         text[] not null defau
 alter table thoughts add column if not exists topic        text;
 alter table thoughts add column if not exists merged_into  uuid references thoughts(id);    -- set by Dreaming; never deletes the original
 alter table thoughts add column if not exists dreamed_at   timestamptz;                      -- null = not yet processed by Dreaming
+-- Set by the retract tool, which can only touch notes saved by an unattended sync (tag 'auto-sync'). A retracted
+-- note is hidden everywhere (search, list, sync, Dreaming) but never deleted, and can be restored.
+alter table thoughts add column if not exists retracted_at timestamptz;
 
 -- Backfill rows that predate these columns. The hash normalization matches the edge function:
 -- trim, collapse whitespace, lowercase.

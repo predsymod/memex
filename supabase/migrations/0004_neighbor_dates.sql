@@ -6,7 +6,7 @@ returns table (id uuid, content text, created_at timestamptz, similarity float)
 language sql stable as $$
   select t.id, t.content, t.created_at, 1 - (t.embedding <=> s.embedding) as similarity
   from thoughts s
-  join thoughts t on t.id <> s.id and t.merged_into is null and t.embedding is not null
+  join thoughts t on t.id <> s.id and t.merged_into is null and t.retracted_at is null and t.embedding is not null
                  and t.sensitivity_tier <> 'restricted'
   where s.id = p_id and s.embedding is not null
     and 1 - (t.embedding <=> s.embedding) >= p_min

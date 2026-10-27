@@ -39,7 +39,7 @@ language sql stable as $$
     select t.id, row_number() over (order by t.embedding <=> query_embedding) as r
     from thoughts t
     where query_embedding is not null
-      and t.merged_into is null and t.embedding is not null
+      and t.merged_into is null and t.retracted_at is null and t.embedding is not null
       and (include_restricted or t.sensitivity_tier <> 'restricted')
       and 1 - (t.embedding <=> query_embedding) >= min_similarity
     order by t.embedding <=> query_embedding
@@ -49,7 +49,7 @@ language sql stable as $$
     select t.id, row_number() over (order by ts_rank_cd(t.fts, p.q) desc) as r
     from thoughts t cross join params p
     where p.q <> ''::tsquery and t.fts @@ p.q
-      and t.merged_into is null
+      and t.merged_into is null and t.retracted_at is null
       and (include_restricted or t.sensitivity_tier <> 'restricted')
     order by ts_rank_cd(t.fts, p.q) desc
     limit 50

@@ -45,7 +45,7 @@ console.log('\n=== A. Fresh install on an empty database');
     const tables = (await q(db, "select table_name from information_schema.tables where table_schema='public'")).map((r) => r.table_name);
     for (const t of ['thoughts', 'thought_links', 'sync_cursors', 'dream_log']) check(`table ${t} exists`, tables.includes(t));
     const cols = (await q(db, "select column_name from information_schema.columns where table_name='thoughts'")).map((r) => r.column_name);
-    for (const c of ['content_hash', 'source', 'tags', 'topic', 'merged_into', 'dreamed_at', 'summary', 'entities', 'type', 'importance', 'sensitivity_tier', 'fts'])
+    for (const c of ['content_hash', 'source', 'tags', 'topic', 'merged_into', 'dreamed_at', 'summary', 'entities', 'type', 'importance', 'sensitivity_tier', 'fts', 'retracted_at'])
       check(`thoughts.${c}`, cols.includes(c));
 
     // hash trigger and uniqueness
@@ -87,6 +87,16 @@ console.log('\n=== A. Fresh install on an empty database');
     // neighbors
     const n = await q(db, 'select * from neighbors_of($1, 5, 0.5)', [ids['Alpha']]);
     check('neighbors_of returns the near thought with created_at', n.length === 1 && n[0].content.startsWith('Beta') && n[0].created_at);
+
+    // retraction: a retracted note disappears from search (both sides) and from Dreaming's neighbor lookup, and comes back on restore
+    await db.query('update thoughts set retracted_at = now() where id = $1', [ids['Beta ']]);
+    const rs = await q(db, 'select content from search_memex($1, $2::vector, 10, 0.3)', ['quokkas', vec(0)]);
+    check('retracted note hidden from semantic and keyword search', !rs.some((r) => r.content.startsWith('Beta')) && rs.some((r) => r.content.startsWith('Alpha')), JSON.stringify(rs));
+    const rn = await q(db, 'select * from neighbors_of($1, 5, 0.5)', [ids['Alpha']]);
+    check('retracted note hidden from neighbors_of', rn.length === 0);
+    await db.query('update thoughts set retracted_at = null where id = $1', [ids['Beta ']]);
+    const rr = await q(db, 'select content from search_memex($1, $2::vector, 10, 0.3)', ['quokkas', vec(0)]);
+    check('restored note is searchable again', rr.some((r) => r.content.startsWith('Beta')));
     // other tables
     await db.query("insert into sync_cursors (source) values ('muse')");
     await db.query("insert into dream_log (run_id, action) values (gen_random_uuid(), 'enrich')");

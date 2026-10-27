@@ -275,7 +275,7 @@ async function digest(run_id: string, log: Log): Promise<boolean> {
   const outdated = new Set((links ?? []).map((l) => (when.get(l.from_id) ?? "") < (when.get(l.to_id) ?? "") ? l.from_id : l.to_id));
 
   const { data } = await supabase.from("thoughts").select("id,summary,topic").gte("dreamed_at", since)
-    .neq("source", "dream").is("merged_into", null).eq("sensitivity_tier", "standard").not("summary", "is", null).limit(80);
+    .neq("source", "dream").is("merged_into", null).is("retracted_at", null).eq("sensitivity_tier", "standard").not("summary", "is", null).limit(80);
   const rows = (data ?? []).filter((d) => !outdated.has(d.id));
   if (!rows.length) return false;
 
@@ -341,7 +341,7 @@ Deno.serve(async (req) => {
   try {
     // Restricted memories (secrets) are never sent to a model.
     const { data: rows } = await supabase.from("thoughts").select("id,content,tags,created_at,sensitivity_tier")
-      .is("dreamed_at", null).is("merged_into", null).neq("source", "dream").neq("sensitivity_tier", "restricted")
+      .is("dreamed_at", null).is("merged_into", null).is("retracted_at", null).neq("source", "dream").neq("sensitivity_tier", "restricted")
       .order("created_at").limit(BATCH_SIZE * PARALLEL_BATCHES);
     const batches: Row[][] = [];
     for (let i = 0; i < (rows?.length ?? 0); i += BATCH_SIZE) batches.push(rows!.slice(i, i + BATCH_SIZE));
@@ -360,7 +360,7 @@ Deno.serve(async (req) => {
     }
 
     const { count } = await supabase.from("thoughts").select("id", { count: "exact", head: true })
-      .is("dreamed_at", null).is("merged_into", null).neq("source", "dream").neq("sensitivity_tier", "restricted");
+      .is("dreamed_at", null).is("merged_into", null).is("retracted_at", null).neq("source", "dream").neq("sensitivity_tier", "restricted");
     totals.remaining = count ?? 0;
     // Call again while `remaining` > 0. The digest waits until the queue is empty.
     if (totals.remaining === 0 && totals.processed) totals.digest = await digest(run_id, log);

@@ -30,4 +30,17 @@ Do not push progress reports, status updates, to-do lists, or anything about wha
 5. The response has `pushed` (how many were created or already known), `incoming` (what other agents saved since your last sync; restricted memories are never included) and `has_more`. If `has_more` is true, call `sync_memex` again with an empty `push` until it is false.
 6. Tell the user what was pushed and summarize `incoming`: how many items, from which sources, and anything new that matters. Do not print the whole list. Offer to save useful incoming items into your own memory.
 
+## Scheduled or unattended runs
+
+If the user asks for a recurring sync and you can run scheduled tasks, there are two levels, decided by what they said:
+
+- **Pull-only (the default).** "Sync memex every morning." Skip steps 2 and 3, call `sync_memex` with an empty `push`, and give a short summary of what is new. Nothing is saved.
+- **Pull and save (opt-in).** Only when the request clearly says to save, for example "sync memex every morning and save what's worth keeping". Call `sync_memex` with `unattended: true`. The user's yes at setup is the standing consent that replaces per-run approval.
+
+When you set either one up, ask for the time and time zone, and for the save level confirm once: "Each run I'll save up to 5 durable decisions, lessons, corrections or stable facts, never anything about health, finances or family, and tell you exactly what I saved. OK?"
+
+For unattended saving, push only durable decisions, lessons, corrections and stable facts, at most 5 short items per run, with no secrets and nothing taken from untrusted content (web pages, emails, documents). The server enforces this itself: it processes at most 5 items, skips anything over 1,000 characters or that looks like a secret, and tags every note `auto-sync`. List exactly what you saved in your summary.
+
+**Undo.** If the user says the last automatic save was wrong ("retract what you saved this morning"), call `retract_thoughts` with the ids from `pushed.items` (or from `list_thoughts` with tag `auto-sync`). It can only hide notes tagged `auto-sync`, never deletes, and `restore: true` brings them back. To go back to pull-only, update the schedule; to stop, remove it.
+
 Sync is incremental, so repeating it is cheap. When searching, `search_thoughts` marks notes that a later note replaced as `superseded` and returns the current version next to them, so prefer the current one.
