@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Memex: your AI memory, owned by you</title>
+<meta name="description" content="An open-source personal memory that any AI agent can use. Your own database, your own keys, pennies a month. Point an agent at the repo and it sets everything up.">
+<meta name="color-scheme" content="light dark">
+<style>
+  :root {
+    --bg: #fbfaf7; --surface: #ffffff; --ink: #1c1b19; --muted: #5d5a54; --line: #e6e2d9;
+    --accent: #b4521f; --accent-ink: #ffffff; --soft: #f3efe6; --code-bg: #1f1d1a; --code-ink: #f1ece2;
+    --ok: #2f7d4f;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #151412; --surface: #1d1b18; --ink: #f1ece2; --muted: #a8a299; --line: #2e2b26;
+      --accent: #e0834f; --accent-ink: #1a1209; --soft: #1f1d1a; --code-bg: #0f0e0c; --code-ink: #f1ece2;
+      --ok: #6cc592;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 17px/1.6 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  .wrap { max-width: 920px; margin: 0 auto; padding: 0 20px; }
+  header.top { padding: 22px 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .brand { font-weight: 700; letter-spacing: -0.02em; font-size: 20px; }
+  .brand span { color: var(--accent); }
+  nav a { color: var(--muted); text-decoration: none; margin-left: 18px; font-size: 15px; }
+  nav a:hover, nav a:focus-visible { color: var(--ink); text-decoration: underline; }
+  .hero { padding: 40px 0 28px; }
+  .badge {
+    display: inline-block; font-size: 13px; padding: 3px 10px; border: 1px solid var(--line);
+    border-radius: 999px; color: var(--muted); background: var(--surface);
+  }
+  h1 { font-size: clamp(34px, 6vw, 56px); line-height: 1.08; letter-spacing: -0.03em; margin: 16px 0 14px; }
+  .lede { font-size: 20px; color: var(--muted); max-width: 640px; margin: 0 0 26px; }
+  .prompt {
+    display: flex; align-items: stretch; gap: 0; background: var(--code-bg); color: var(--code-ink);
+    border-radius: 12px; overflow: hidden; max-width: 720px;
+  }
+  .prompt code { flex: 1; padding: 16px 18px; font: 15px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; overflow-wrap: anywhere; }
+  .prompt button {
+    border: 0; background: var(--accent); color: var(--accent-ink); font: inherit; font-weight: 600;
+    padding: 0 20px; cursor: pointer; min-width: 92px;
+  }
+  .prompt button:hover { filter: brightness(1.08); }
+  button:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  .hint { color: var(--muted); font-size: 15px; margin: 10px 0 0; }
+  section { padding: 34px 0; }
+  h2 { font-size: 28px; letter-spacing: -0.02em; margin: 0 0 8px; }
+  .sub { color: var(--muted); margin: 0 0 22px; max-width: 660px; }
+  .cards { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 20px; }
+  .card h3 { margin: 0 0 6px; font-size: 18px; }
+  .card p { margin: 0 0 12px; color: var(--muted); font-size: 16px; }
+  .say { font: 14px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: var(--soft); border-radius: 8px; padding: 10px 12px; color: var(--ink); overflow-wrap: anywhere; }
+  .tag { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--accent); font-weight: 700; }
+  figure { margin: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 18px; }
+  figure { overflow-x: auto; }
+  figure svg { width: 100%; min-width: 600px; height: auto; display: block; }
+  figcaption { color: var(--muted); font-size: 15px; margin-top: 8px; }
+  .facts { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); margin-top: 6px; }
+  .fact { border-left: 3px solid var(--accent); padding: 4px 0 4px 14px; }
+  .fact b { display: block; font-size: 22px; letter-spacing: -0.02em; }
+  .fact span { color: var(--muted); font-size: 15px; }
+  ul.plain { padding-left: 20px; margin: 0; }
+  ul.plain li { margin: 6px 0; }
+  .note { background: var(--soft); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; color: var(--muted); font-size: 16px; }
+  footer { padding: 34px 0 56px; color: var(--muted); font-size: 15px; border-top: 1px solid var(--line); margin-top: 24px; }
+  a { color: var(--accent); }
+  @media (max-width: 560px) { .prompt { flex-direction: column; } .prompt button { padding: 12px; } nav { display: none; } }
+  @media (prefers-reduced-motion: no-preference) { .prompt button { transition: filter .15s; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">Mem<span>ex</span></div>
+    <nav><a href="#how">How it works</a><a href="#dreaming">Dreaming</a><a href="#yours">Your data</a><a class="repo-link" href="https://github.com/predsymod/memex">GitHub</a></nav>
+  </header>
+
+  <main>
+    <div class="hero">
+      <span class="badge">Open source · work in progress</span>
+      <h1>Your AI memory shouldn't live inside one app.</h1>
+      <p class="lede">Keep your memory in your own database and let any AI agent use it. Start in one agent, pick up in another, and your context goes with you.</p>
+      <div class="prompt">
+        <code id="prompt-text">Hi agent, set up Memex for me. Follow the instructions in SETUP.md at https://github.com/predsymod/memex</code>
+        <button id="copy" type="button" aria-label="Copy the setup prompt">Copy</button>
+      </div>
+      <p class="hint">Paste that into any coding agent. It walks you through the setup and does the typing for you.</p>
+    </div>
+
+    <section id="how">
+      <h2>Three things you say</h2>
+      <p class="sub">Memex is an MCP server that runs on your own Supabase project. Agents connect to it, and the instructions they follow are plain text in the repo.</p>
+      <div class="cards">
+        <div class="card">
+          <span class="tag">Setup</span>
+          <h3>Point an agent at the repo</h3>
+          <p>It creates the tables, deploys the server and connects itself. You approve the steps that need an account.</p>
+          <div class="say">"Set up Memex. Follow SETUP.md in the repo."</div>
+        </div>
+        <div class="card">
+          <span class="tag">Sync</span>
+          <h3>One memory, every agent</h3>
+          <p>An agent pushes what it knows that is worth keeping and pulls what the others learned, without duplicates. You review what it pushes.</p>
+          <div class="say">"Sync memex."</div>
+        </div>
+        <div class="card">
+          <span class="tag">Invoke</span>
+          <h3>Use it in your work</h3>
+          <p>Search blends meaning with exact words, favors recent notes when you ask, and shows the current version of anything that was corrected.</p>
+          <div class="say">"Review memex, then draft the plan."</div>
+        </div>
+      </div>
+    </section>
+
+    <section aria-labelledby="arch">
+      <h2 id="arch">How the pieces fit</h2>
+      <figure>
+        <svg viewBox="0 0 760 220" role="img" aria-label="Agents such as Claude, Muse, Codex and Cursor connect through MCP to the Memex server on your Supabase project, which stores memories in Postgres with vectors. A nightly Dreaming job organizes them.">
+          <g font-family="ui-sans-serif, system-ui, sans-serif" font-size="15" fill="currentColor">
+            <g stroke="var(--line)" stroke-width="1.5" fill="var(--soft)">
+              <rect x="10" y="14" width="150" height="38" rx="9"/><rect x="10" y="62" width="150" height="38" rx="9"/>
+              <rect x="10" y="110" width="150" height="38" rx="9"/><rect x="10" y="158" width="150" height="38" rx="9"/>
+              <rect x="250" y="60" width="200" height="100" rx="14" fill="var(--surface)" stroke="var(--accent)" stroke-width="2"/>
+              <rect x="540" y="14" width="210" height="76" rx="14" fill="var(--surface)"/>
+              <rect x="540" y="116" width="210" height="76" rx="14" fill="var(--surface)"/>
+            </g>
+            <g text-anchor="middle">
+              <text x="85" y="39">Claude</text><text x="85" y="87">Muse</text><text x="85" y="135">Codex</text><text x="85" y="183">Cursor, others</text>
+              <text x="350" y="100" font-weight="700">Memex server</text>
+              <text x="350" y="122" fill="var(--muted)" font-size="13">MCP over HTTPS · your key</text>
+              <text x="645" y="48" font-weight="700">Your Supabase</text>
+              <text x="645" y="70" fill="var(--muted)" font-size="13">Postgres + vectors</text>
+              <text x="645" y="150" font-weight="700">Dreaming</text>
+              <text x="645" y="172" fill="var(--muted)" font-size="13">nightly, optional</text>
+            </g>
+            <g stroke="var(--accent)" stroke-width="2" fill="none" stroke-linecap="round">
+              <path d="M160 33 L250 85"/><path d="M160 81 L250 100"/><path d="M160 129 L250 120"/><path d="M160 177 L250 138"/>
+              <path d="M450 95 L540 60"/><path d="M645 116 L645 90"/>
+            </g>
+          </g>
+        </svg>
+        <figcaption>No hosted service in the middle. The server and the database both live in your own Supabase project.</figcaption>
+      </figure>
+    </section>
+
+    <section id="dreaming">
+      <h2>Dreaming <span class="badge">optional</span></h2>
+      <p class="sub">A nightly job reads what you saved since the last run and organizes it. It never deletes or rewrites what you wrote. Everything it changes is logged and can be undone.</p>
+      <ul class="plain">
+        <li><b>Tags, summaries and types</b> for every memory, with relative dates like "next Friday" turned into real dates.</li>
+        <li><b>Connections</b> between memories: related, elaborates, supersedes, duplicate.</li>
+        <li><b>Corrections win.</b> When a later note corrects an earlier one, the old one is marked superseded, ranks lower in search, and the current version is shown next to it.</li>
+        <li><b>A short digest</b> of what changed.</li>
+      </ul>
+      <div class="facts" style="margin-top:22px">
+        <div class="fact"><b>115 → 40 s</b><span>one pass over a real personal memory of 115 notes</span></div>
+        <div class="fact"><b>Under $1</b><span>for that first pass; pennies a day after</span></div>
+        <div class="fact"><b>Off by default</b><span>it only runs if you add a model API key</span></div>
+      </div>
+    </section>
+
+    <section id="yours">
+      <h2>Your data, your keys</h2>
+      <ul class="plain">
+        <li>Memories live in your own Supabase database. There is no Memex server run by anyone else.</li>
+        <li>Costs are pennies a month: a small embeddings charge per memory, plus Dreaming if you turn it on.</li>
+        <li>Anything that looks like a secret (keys, tokens, card or ID numbers) is flagged, never sent to a model, and hidden from search and sync.</li>
+        <li>Agents are told to treat memories as evidence, never as instructions.</li>
+      </ul>
+      <p class="note" style="margin-top:18px"><b>One thing to know:</b> memories are sent to an embeddings provider so they can be searched by meaning, and to a model provider if you enable Dreaming. You choose the providers, and the repo says exactly what is sent.</p>
+    </section>
+
+    <section>
+      <h2>Works with</h2>
+      <p class="sub">Tested with Claude and Muse, reading and writing the same memory. Any agent that supports MCP over HTTP should work: Codex, Cursor, VS Code and others connect with a URL and a key.</p>
+    </section>
+  </main>
+
+  <footer>
+    <p>Memex is building on the excellent <a href="https://github.com/NateBJones-Projects/OB1">Open Brain</a> project by Nate B. Jones, and on an earlier write-up, <a href="https://muzayan.substack.com/p/liberating-memory">Liberating memory</a>. Source and setup instructions are on <a class="repo-link" href="https://github.com/predsymod/memex">GitHub</a>.</p>
+  </footer>
+</div>
+
+<script>
+  // Set the repository once. Every link and the copyable prompt below follow it.
+  var REPO = "https://github.com/predsymod/memex";
+  document.querySelectorAll(".repo-link").forEach(function (a) { a.href = REPO; });
+  var promptText = "Hi agent, set up Memex for me. Follow the instructions in SETUP.md at " + REPO;
+  document.getElementById("prompt-text").textContent = promptText;
+
+  var btn = document.getElementById("copy");
+  btn.addEventListener("click", function () {
+    function done(ok) {
+      btn.textContent = ok ? "Copied" : "Select it";
+      setTimeout(function () { btn.textContent = "Copy"; }, 1800);
+    }
+    try {
+      navigator.clipboard.writeText(promptText).then(function () { done(true); }, function () { fallback(); });
+    } catch (e) { fallback(); }
+    function fallback() {
+      try {
+        var r = document.createRange(); r.selectNodeContents(document.getElementById("prompt-text"));
+        var s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+        done(document.execCommand("copy"));
+      } catch (e) { done(false); }
+    }
+  });
+</script>
+</body>
+</html>

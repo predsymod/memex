@@ -1,0 +1,5 @@
+# Keep LF everywhere so shell scripts and the git hook work on macOS and Linux.
+* text=auto eol=lf
+*.ps1 text eol=lf
+*.png binary
+*.jpg binary

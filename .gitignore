@@ -1,0 +1,21 @@
+# secrets: never commit
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+secrets.*
+
+# supabase local state (contains project ref and tokens)
+supabase/.temp/
+supabase/.branches/
+.supabase/
+
+# tooling
+node_modules/
+.DS_Store
+Thumbs.db
+*.log
+
+# local-only list of personal strings the secret scan must never let into a commit
+.secretscan-extra
