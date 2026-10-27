@@ -1,6 +1,8 @@
 # Memex
 
-A personal memory you own, that works with any AI agent.
+**Your repo remembers the code. Memex remembers you and your work.**
+
+A context layer you own that works with any AI agent: the durable stuff, like preferences, decisions and their reasons, people, plans and background, shared across every tool you use. Code-specific context stays where it already lives (your repo, `CLAUDE.md`, `AGENTS.md`); Memex holds what a repo can't, so you don't re-explain yourself in each new app.
 
 Tell your agent: **"Set up a Memex for me using this repo"** and it follows [SETUP.md](SETUP.md). Later, tell any agent **"sync memex"** and it follows [SYNC.md](SYNC.md).
 

@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Memex: your AI memory, owned by you</title>
-<meta name="description" content="An open-source personal memory that any AI agent can use. Your own database, your own keys, pennies a month. Point an agent at the repo and it sets everything up.">
+<title>Memex: your context, owned by you</title>
+<meta name="description" content="Your repo remembers the code. Memex remembers you. An open-source context layer you own: the durable stuff about you and your work, shared across every AI tool. Your own database, your own keys, pennies a month.">
 <meta name="color-scheme" content="light dark">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
@@ -88,14 +88,31 @@
   <main>
     <div class="hero">
       <span class="badge">Open source · work in progress</span>
-      <h1>Your AI memory shouldn't live inside one app.</h1>
-      <p class="lede">Keep your memory in your own database and let any AI agent use it. Start in one agent, pick up in another, and your context goes with you.</p>
+      <h1>Your repo remembers the code. Memex remembers you.</h1>
+      <p class="lede">The durable context about you and your work, like preferences, decisions and background, shouldn't live inside one AI app. Keep it in your own database and let any agent use it.</p>
       <div class="prompt">
         <code id="prompt-text">Hi agent, set up Memex for me. Follow the instructions in SETUP.md at https://github.com/predsymod/memex</code>
         <button id="copy" type="button" aria-label="Copy the setup prompt">Copy</button>
       </div>
       <p class="hint">Paste that into any coding agent. It walks you through the setup and does the typing for you.</p>
     </div>
+
+    <section aria-labelledby="holds">
+      <h2 id="holds">What goes in Memex</h2>
+      <p class="sub">The durable, cross-cutting context that every tool should know, and that no single repo can hold.</p>
+      <div class="cards">
+        <div class="card">
+          <span class="tag">Yes</span>
+          <h3>What follows you</h3>
+          <p>Your preferences and how you like to work, decisions and the reasons behind them, corrections, people and plans, and stable background on your products and projects.</p>
+        </div>
+        <div class="card">
+          <span class="tag">Not here</span>
+          <h3>What lives in the repo</h3>
+          <p>Code-specific context, status updates and to-dos stay in your repo, <code>CLAUDE.md</code> or <code>AGENTS.md</code>. Agents are told to leave them out of Memex.</p>
+        </div>
+      </div>
+    </section>
 
     <section id="how">
       <h2>Three things you say</h2>
