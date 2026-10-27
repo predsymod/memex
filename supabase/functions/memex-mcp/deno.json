@@ -1,9 +1,9 @@
 {
   "imports": {
-    "@hono/mcp": "npm:@hono/mcp@0.1.1",
-    "@modelcontextprotocol/sdk/": "npm:/@modelcontextprotocol/sdk@1.24.3/",
-    "hono": "npm:hono@4.9.7",
-    "zod": "npm:zod@3.25.76",
-    "@supabase/supabase-js": "npm:@supabase/supabase-js@2.47.10"
+    "@hono/mcp": "npm:@hono/mcp@0.3.2",
+    "@modelcontextprotocol/sdk/": "npm:/@modelcontextprotocol/sdk@1.32.2/",
+    "hono": "npm:hono@4.13.14",
+    "zod": "npm:zod@4.6.7",
+    "@supabase/supabase-js": "npm:@supabase/supabase-js@2.118.0"
   }
 }

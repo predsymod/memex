@@ -6,6 +6,7 @@
 // Scheduled by pg_cron (see supabase/schedule-dreaming.sql). With no provider key configured it does nothing.
 import { createClient } from "@supabase/supabase-js";
 import { asTier, clean, maxTier, scanTier, type Tier } from "../_shared/sensitivity.ts";
+import { matchesAny } from "../_shared/auth.ts";
 
 const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
@@ -304,8 +305,7 @@ async function digest(run_id: string, log: Log): Promise<boolean> {
 // ---------- entry point ----------
 
 Deno.serve(async (req) => {
-  const given = req.headers.get("x-brain-key");
-  if (!given || !ACCEPTED_KEYS.includes(given)) return new Response("unauthorized", { status: 401 });
+  if (!matchesAny(req.headers.get("x-brain-key"), ACCEPTED_KEYS)) return new Response("unauthorized", { status: 401 });
   if (!PROVIDERS.length) return Response.json({ skipped: "Dreaming is not configured" });
   const url = new URL(req.url);
 

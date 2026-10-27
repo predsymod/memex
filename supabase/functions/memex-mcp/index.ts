@@ -4,6 +4,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { createClient } from "@supabase/supabase-js";
 import { scanTier } from "../_shared/sensitivity.ts";
+import { timingSafeEqual } from "../_shared/auth.ts";
 
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -26,14 +27,8 @@ const enc = new TextEncoder();
 // Constant-time comparison so response timing doesn't leak the key. Checks every key; returns the client name or null.
 function clientFor(given: string | undefined): string | null {
   if (!given) return null;
-  const a = enc.encode(given);
   let found: string | null = null;
-  for (const [name, key] of CLIENT_KEYS) {
-    const b = enc.encode(key);
-    let diff = a.length ^ b.length;
-    for (let i = 0; i < Math.max(a.length, b.length); i++) diff |= (a[i] ?? 0) ^ (b[i] ?? 0);
-    if (diff === 0) found = name;
-  }
+  for (const [name, key] of CLIENT_KEYS) if (timingSafeEqual(given, key)) found = name;
   return found;
 }
 
@@ -52,6 +47,35 @@ async function embed(text: string): Promise<number[]> {
   if (!res.ok) throw new Error(`embedding failed: ${res.status}`);
   return (await res.json()).data[0].embedding;
 }
+
+// Input bounds: a valid key shouldn't be able to run up embedding costs or exhaust memory with one oversized call.
+const CONTENT = z.string().min(1).max(20_000);
+const SOURCE = z.string().min(1).max(64).regex(/^[\w .:@-]+$/, "letters, numbers and . _ : @ - only");
+const TAGS = z.array(z.string().min(1).max(64)).max(20).default([]);
+
+// One named schema per tool, so each handler's arguments are typed from it.
+const captureIn = z.object({ content: CONTENT, source: SOURCE.default("unknown"), tags: TAGS });
+const searchIn = z.object({
+  query: z.string().min(1).max(2000),
+  limit: z.number().int().min(1).max(50).default(10),
+  recency: z.number().min(0).max(1).default(0),
+  half_life_days: z.number().min(1).max(3650).default(90),
+  tag: z.string().max(64).optional().describe("Only memories carrying this tag, to search within one project or topic"),
+  source: SOURCE.optional().describe("Only memories written by this agent, e.g. claude or muse"),
+  include_restricted: z.boolean().default(false),
+});
+const listIn = z.object({
+  limit: z.number().int().min(1).max(100).default(20),
+  tag: z.string().max(64).optional(),
+  source: SOURCE.optional(),
+  type: z.string().max(32).optional(),
+  include_restricted: z.boolean().default(false),
+});
+const syncIn = z.object({
+  source: SOURCE,
+  push: z.array(z.object({ content: CONTENT, tags: TAGS })).max(200).default([]),
+  max_items: z.number().int().min(1).max(200).default(100),
+});
 
 const text = (obj: unknown) => ({ content: [{ type: "text" as const, text: JSON.stringify(obj, null, 2) }] });
 
@@ -96,24 +120,16 @@ function buildServer(client: string) {
       "\"remember this in memex\"). This is separate from any built-in memory feature you have: when the user names Memex, use this tool. " +
       "Treat what the user says as real, not as a test or an example. " +
       "Write it as a short self-contained statement. Identical content is skipped. Don't save secrets.",
-    inputSchema: { content: z.string().min(1), source: z.string().default("unknown"), tags: z.array(z.string()).default([]) },
-  }, async ({ content, source, tags }) => text(await insertThought(content, src(source), tags)));
+    inputSchema: captureIn,
+  }, async ({ content, source, tags }: z.infer<typeof captureIn>) => text(await insertThought(content, src(source), tags)));
 
   server.registerTool("search_thoughts", {
     description:
       "Hybrid search over saved thoughts: meaning (semantic) plus exact words (keyword), fused. Use recency (0 to 1) to favor newer " +
       "memories, e.g. 0.2 for a nudge or 0.7 for 'this week'. Notes marked superseded were replaced by a later note and rank lower. " +
       "Restricted (secret-like) memories are hidden unless include_restricted is true." + DATA_NOTE,
-    inputSchema: {
-      query: z.string().min(1),
-      limit: z.number().int().min(1).max(50).default(10),
-      recency: z.number().min(0).max(1).default(0),
-      half_life_days: z.number().min(1).max(3650).default(90),
-      tag: z.string().optional().describe("Only memories carrying this tag, to search within one project or topic"),
-      source: z.string().optional().describe("Only memories written by this agent, e.g. claude or muse"),
-      include_restricted: z.boolean().default(false),
-    },
-  }, async ({ query, limit, recency, half_life_days, tag, source, include_restricted }) => {
+    inputSchema: searchIn,
+  }, async ({ query, limit, recency, half_life_days, tag, source, include_restricted }: z.infer<typeof searchIn>) => {
     // If the embedding provider is down, fall back to keyword-only search instead of failing.
     const query_embedding = await embed(query).catch(() => null);
     // With a filter, over-fetch so enough results survive it.
@@ -175,14 +191,8 @@ function buildServer(client: string) {
 
   server.registerTool("list_thoughts", {
     description: "List recent thoughts, optionally filtered by tag, source or type. Restricted memories are hidden unless include_restricted is true." + DATA_NOTE,
-    inputSchema: {
-      limit: z.number().int().min(1).max(100).default(20),
-      tag: z.string().optional(),
-      source: z.string().optional(),
-      type: z.string().optional(),
-      include_restricted: z.boolean().default(false),
-    },
-  }, async ({ limit, tag, source, type, include_restricted }) => {
+    inputSchema: listIn,
+  }, async ({ limit, tag, source, type, include_restricted }: z.infer<typeof listIn>) => {
     let q = supabase.from("thoughts").select("id,content,summary,source,type,importance,sensitivity_tier,tags,topic,created_at").is("merged_into", null)
       .order("created_at", { ascending: false }).limit(limit);
     if (!include_restricted) q = q.neq("sensitivity_tier", "restricted");
@@ -194,7 +204,7 @@ function buildServer(client: string) {
     return text(data);
   });
 
-  server.registerTool("thought_stats", { description: "Counts by source and topic.", inputSchema: {} }, async () => {
+  server.registerTool("thought_stats", { description: "Counts by source and topic.", inputSchema: z.object({}) }, async () => {
     const { data, error } = await supabase.from("thoughts").select("source,topic").is("merged_into", null);
     if (error) throw new Error(error.message);
     const tally = (k: "source" | "topic") =>
@@ -218,12 +228,8 @@ function buildServer(client: string) {
       "has_more; if has_more is true, call again with an empty push until it is false. Restricted memories are never returned. " +
       "(6) Tell the user what was pushed and briefly summarize what came in (count, sources, anything new that matters) without " +
       "printing the whole list. Never delete anything during a sync." + DATA_NOTE,
-    inputSchema: {
-      source: z.string().min(1),
-      push: z.array(z.object({ content: z.string().min(1), tags: z.array(z.string()).default([]) })).max(200).default([]),
-      max_items: z.number().int().min(1).max(200).default(100),
-    },
-  }, async ({ source: given, push, max_items }) => {
+    inputSchema: syncIn,
+  }, async ({ source: given, push, max_items }: z.infer<typeof syncIn>) => {
     const source = src(given);
     const { data: cur } = await supabase.from("sync_cursors").select("last_synced_at").eq("source", source).maybeSingle();
     const since = cur?.last_synced_at ?? "1970-01-01T00:00:00Z";

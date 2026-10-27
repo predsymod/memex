@@ -36,10 +36,13 @@ Verify: the `thoughts`, `thought_links`, `sync_cursors` and `dream_log` tables e
 Run `scripts/generate-key.sh` (or `scripts/generate-key.ps1` on Windows). Show it to the user once and tell them to save it in a password manager, and put it in `.env` as `MCP_ACCESS_KEY`.
 
 ## 6. Set secrets
+Have the user fill in `.env` (copy `.env.example`; it is git-ignored) with `MCP_ACCESS_KEY` and `OPENROUTER_API_KEY`, then:
 ```
-supabase secrets set MCP_ACCESS_KEY=<key> OPENROUTER_API_KEY=<key>
+supabase secrets set --env-file .env
 ```
-Only if a client can pass the key in the URL and nothing else: `supabase secrets set ALLOW_URL_KEY=true`. The key then appears in server logs, so tell the user.
+Reading from the file keeps keys out of the command line, shell history and process lists. (The CLI skips names it reserves.) Never type a key into a `supabase secrets set NAME=value` command.
+
+Only if a client can pass the key in the URL and nothing else, add `ALLOW_URL_KEY=true` to `.env` before running it. The key then appears in server logs, so tell the user.
 
 ## 7. Deploy
 ```
@@ -59,9 +62,8 @@ Call `capture_thought` with "Memex setup test", then `search_thoughts` for "setu
 
 ## 10. Optional: Dreaming
 A nightly job that tags, summarizes and connects memories. Skip it if the user has no Meta or OpenRouter key; Memex works without it.
-```
-supabase secrets set META_API_KEY=<key> META_REASONING_EFFORT=minimal
-```
+Have the user add `META_API_KEY` and `META_REASONING_EFFORT=minimal` to `.env`, then run `supabase secrets set --env-file .env` again.
+
 Then substitute `<PROJECT_REF>` and `<DREAM_KEY>` (the access key) in `supabase/schedule-dreaming.sql` and run it once, for example with `supabase db query --linked --file <file>`. Do not commit the substituted file; delete it afterwards. Dreaming runs daily at 09:00 UTC. If the user later rotates the access key, update the `memex_dream_key` secret in Supabase Vault too, or the nightly call gets a 401.
 
 ## 11. If anything went wrong: offer a setup report

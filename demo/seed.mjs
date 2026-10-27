@@ -21,6 +21,10 @@ writeMarker(new Date().toISOString());
 const made = [];
 for (const n of notes) {
   const out = JSON.parse(await callTool(cfg, "capture_thought", { content: n.content, source: "claude", tags: ["memex-demo", "fernwood"] }));
+  // The id goes into SQL below, so insist it really is a UUID.
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(out.id) || !Number.isInteger(n.daysAgo)) {
+    console.error("Unexpected id or daysAgo; stopping."); process.exit(1);
+  }
   made.push({ id: out.id, daysAgo: n.daysAgo });
   console.log(`${out.status.padEnd(9)} ${n.content.slice(0, 64)}`);
 }
