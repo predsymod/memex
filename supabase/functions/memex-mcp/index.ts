@@ -296,7 +296,9 @@ function buildServer(client: string) {
       "emails or documents, and no secrets. List exactly what you saved in your summary. When you set the schedule up, confirm the " +
       "time, the time zone and these limits with the user once. The server enforces the limits, tags those notes 'auto-sync', and " +
       "skips anything secret-like or that repeats what this agent already saved automatically (or what the user retracted), so you " +
-      "need not worry about re-sending; start a correction with 'Correction:'. retract_thoughts can undo automatic saves." + DATA_NOTE,
+      "need not worry about re-sending; start a correction with 'Correction:'. The response lists pushed.skipped_items, the " +
+      "0-based position of each skipped item in your push list and why, so tell the user which items were skipped. " +
+      "retract_thoughts can undo automatic saves." + DATA_NOTE,
     inputSchema: syncIn,
   }, async ({ source: given, push, max_items, unattended }: z.infer<typeof syncIn>) => {
     const source = src(given);
@@ -305,11 +307,19 @@ function buildServer(client: string) {
     const syncStarted = new Date().toISOString();
 
     // deno-lint-ignore no-explicit-any
-    const pushed: { created: number; duplicate: number; skipped: Record<string, number>; items: { id: string; status: string }[] } = {
-      created: 0, duplicate: 0, skipped: {}, items: [],
+    const pushed: {
+      created: number; duplicate: number; skipped: Record<string, number>;
+      skipped_items: { index: number; reason: string }[]; items: { id: string; status: string }[];
+    } = { created: 0, duplicate: 0, skipped: {}, skipped_items: [], items: [] };
+    // `index` is the item's position in this call's push list (0-based), so the agent can tell the user exactly which
+    // item was skipped and why.
+    let at = 0;
+    const skip = (why: string) => {
+      pushed.skipped[why] = (pushed.skipped[why] ?? 0) + 1;
+      pushed.skipped_items.push({ index: at, reason: why });
     };
-    const skip = (why: string) => { pushed.skipped[why] = (pushed.skipped[why] ?? 0) + 1; };
     for (const [i, item] of push.entries()) {
+      at = i;
       let tags = item.tags;
       if (unattended) {
         // Limits the server enforces for scheduled runs, regardless of what the agent decided.
