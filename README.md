@@ -23,8 +23,8 @@ Work in progress for the Meta AI Developer Hackathon (Oct 26 to Nov 4, 2026). Ev
 | Path | What it is |
 |---|---|
 | `SETUP.md`, `SYNC.md` | Instructions written for agents to follow |
-| `supabase/migrations` | Database schema, 5 idempotent migrations |
-| `supabase/functions/memex-mcp` | The MCP server: capture, search, list, stats, sync |
+| `supabase/migrations` | Database schema, 6 idempotent migrations |
+| `supabase/functions/memex-mcp` | The MCP server: capture, search, list, stats, sync, retract |
 | `supabase/functions/memex-dream` | The nightly Dreaming job |
 | `supabase/functions/_shared` | Secret detection and output cleaning used by both |
 | `supabase/schedule-dreaming.sql` | Template that schedules Dreaming (needs your project details; never commit it filled in) |

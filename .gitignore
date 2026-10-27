@@ -22,3 +22,6 @@ Thumbs.db
 
 # marks when the demo was last seeded
 demo/.last-seed
+
+# stray PowerShell redirect artifact
+$null
