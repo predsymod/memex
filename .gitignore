@@ -19,3 +19,6 @@ Thumbs.db
 
 # local-only list of personal strings the secret scan must never let into a commit
 .secretscan-extra
+
+# marks when the demo was last seeded
+demo/.last-seed
