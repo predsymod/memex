@@ -20,14 +20,17 @@ node demo/seed.mjs                  # 9 fictional notes, backdated over the last
 
 ## The live beats (type only these)
 
+Say "memex" when you save. On claude.ai, plain "remember that ..." goes to Claude's own built-in memory, not to Memex
+(found while testing). "save to memex: ..." is just as short and always reaches Memex.
+
 | Beat | Where | You type |
 |---|---|---|
-| 1. Save a fact | Claude | `remember that my favorite color is red` |
+| 1. Save a fact | Claude | `save to memex: my favorite color is red` |
 | 2. Sync | Muse | `hi, sync memex` |
 | 3. Recall | Muse | `what's my favorite color?` |
 | 4. Dreaming | terminal | `node demo/dream.mjs` (about 20 seconds) |
 | 5. Search the club | any agent | `search memex: when does the Fernwood Trail Club meet?` |
-| 6. Secret | Claude | `remember that the demo server password is` followed by any made-up password (invent one; it must be fake) |
+| 6. Secret | Claude | `save to memex: the demo server password is` followed by any made-up password (invent one; it must be fake) |
 | 7. Search for it | Claude | `search memex for the demo server password` (it won't come back) |
 
 For beat 5, the answer should be **7am**, with the older 8am note marked superseded right behind it. Other phrasings
