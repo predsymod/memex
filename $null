@@ -1,7 +1,7 @@
 ﻿npx.cmd : Initialising login role...
-At line:15 char:10
-+ $idRow = npx.cmd --yes supabase db query --linked "select id from tho ...
-+          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+At line:27 char:1
++ npx.cmd --yes supabase db query --linked "select (select count(*) fro ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     + CategoryInfo          : NotSpecified: (Initialising login role...:String) [], RemoteException
     + FullyQualifiedErrorId : NativeCommandError
  

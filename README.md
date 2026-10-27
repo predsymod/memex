@@ -36,6 +36,7 @@ Work in progress for the Meta AI Developer Hackathon (Oct 26 to Nov 4, 2026). Ev
 
 ```
 node scripts/doctor.mjs                 # checks your install (reads MEMEX_URL and MCP_ACCESS_KEY from .env)
+node scripts/check-sync.mjs             # reports on what scheduled syncs saved (counts only; --show adds previews)
 cd tests && npm install && npm test     # runs all migrations on an empty database and on the old schema
 git config core.hooksPath .githooks     # turn on the secret scan before each commit
 ```
