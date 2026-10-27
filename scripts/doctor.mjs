@@ -16,7 +16,7 @@ if (existsSync(".env")) {
 }
 const URL_MCP = process.env.MEMEX_URL;
 const KEY = process.env.MCP_ACCESS_KEY;
-const EXPECTED_TOOLS = ["capture_thought", "search_thoughts", "list_thoughts", "thought_stats", "sync_memex"];
+const EXPECTED_TOOLS = ["capture_thought", "search_thoughts", "list_thoughts", "thought_stats", "sync_memex", "retract_thoughts"];
 
 const results = [];
 const note = (ok, name, detail = "") => {
@@ -62,7 +62,7 @@ try {
   const names = (r.json?.result?.tools ?? []).map((t) => t.name);
   note(r.status === 200, "your key is accepted", `HTTP ${r.status}`);
   const missing = EXPECTED_TOOLS.filter((t) => !names.includes(t));
-  note(missing.length === 0, "all 5 tools are listed", missing.length ? `missing: ${missing.join(", ")}` : "");
+  note(missing.length === 0, `all ${EXPECTED_TOOLS.length} tools are listed`, missing.length ? `missing: ${missing.join(", ")}` : "");
 } catch (e) { note(false, "tools/list", e.message); }
 
 let total = null;
