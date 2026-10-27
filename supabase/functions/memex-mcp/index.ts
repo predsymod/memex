@@ -364,21 +364,21 @@ function buildServer(client: string) {
   // and is reversible, so even a manipulated agent can't erase or hide anything else.
   server.registerTool("retract_thoughts", {
     description:
-      "Undo an automatic save: hide notes that an unattended sync saved (they carry the tag 'auto-sync'), by id. The ids are in the " +
-      "sync response under pushed.items, or list them with list_thoughts and tag 'auto-sync'. Use it only when the user asks to " +
-      "undo or retract what a scheduled sync saved. It cannot touch any other note, it never deletes, and restore=true brings the " +
-      "notes back.",
+      "Undo an automatic save: hide notes that an unattended sync saved (tag 'auto-sync') or that Dreaming wrote itself (tags " +
+      "'synthesis' and 'digest'), by id. The ids are in the sync response under pushed.items, or list them with list_thoughts and " +
+      "the tag. Use it only when the user asks to undo or retract something automatic. It cannot touch any other note, it never " +
+      "deletes, and restore=true brings the notes back.",
     inputSchema: retractIn,
   }, async ({ ids, restore }: z.infer<typeof retractIn>) => {
     const { data, error } = await supabase.from("thoughts")
       .update({ retracted_at: restore ? null : new Date().toISOString() })
-      .in("id", ids).contains("tags", [AUTO_TAG]).select("id");
+      .in("id", ids).or(`tags.cs.{${AUTO_TAG}},tags.cs.{synthesis},tags.cs.{digest}`).select("id");
     if (error) throw new Error(error.message);
     const done = new Set((data ?? []).map((r: { id: string }) => r.id));
     return text({
       [restore ? "restored" : "retracted"]: [...done],
       refused: ids.filter((id) => !done.has(id)),
-      note: "Refused ids are not notes saved by an automatic sync, or do not exist.",
+      note: "Refused ids are not automatic notes (auto-sync, synthesis or digest), or do not exist.",
     });
   });
 

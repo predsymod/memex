@@ -49,6 +49,20 @@ const MIN_SIMILARITY = 0.55;
 const LINK_KINDS = ["related", "elaborates", "supersedes", "contradicts", "duplicate"] as const;
 const TYPES = ["idea", "task", "decision", "lesson", "meeting", "journal", "person_note", "reference", "observation"];
 
+// Synthesis: one overview note per topic that has enough related notes. All three can be changed with Supabase secrets.
+const envIntD = (name: string, fallback: number, min: number, max: number) => {
+  const raw = Deno.env.get(name);
+  const n = raw === undefined || raw.trim() === "" ? NaN : Number(raw);
+  return Number.isInteger(n) && n >= min && n <= max ? n : fallback;
+};
+const SYNTH_ENABLED = (Deno.env.get("DREAM_SYNTHESIS") ?? "on").toLowerCase() !== "off";
+const MAX_SYNTHESES = envIntD("DREAM_MAX_SYNTHESES", 3, 0, 20); // overviews written or refreshed per run; keeps a night cheap
+const MIN_CLUSTER = envIntD("DREAM_MIN_CLUSTER", 4, 2, 20); // notes needed before a topic gets an overview
+const MIN_REFRESH_NEW = envIntD("DREAM_MIN_REFRESH_NEW", 2, 1, 20); // new notes needed in a topic before its overview is rewritten
+const MAX_CLUSTER_NOTES = 25; // most recent notes of a topic fed to the overview
+const CLUSTER_POOL = 300; // most recent eligible notes considered for grouping
+const SYNTH_MAX_CHARS = 1500;
+
 type Row = { id: string; content: string; tags: string[] | null; created_at: string; sensitivity_tier: Tier };
 type Usage = { input: number; output: number };
 type Log = (r: object) => Promise<void>;
@@ -302,6 +316,151 @@ async function digest(run_id: string, log: Log): Promise<boolean> {
   return true;
 }
 
+// ---------- synthesis ----------
+// When enough notes pile up about one topic, write ONE overview note of the current picture, linked back to its sources
+// (derived_from). When new notes join the topic, write a refreshed overview that supersedes the old one. Sources are only
+// ordinary notes: no secrets, nothing superseded or disputed, nothing retracted, nothing Dreaming wrote itself.
+
+const CLUSTER_PROMPT =
+  `You group a personal memory store into topics. ${UNTRUSTED}Each note is listed with its id. Group notes that are about the ` +
+  `same specific project, person, plan or subject. A group needs at least ${MIN_CLUSTER} notes; leave out notes that do not fit ` +
+  `and never force a group. Never make a catch-all, miscellaneous or "background" group: notes that share only a broad theme ` +
+  `(such as being about the same person) stay ungrouped. Each note belongs to at most one group. Give each group a short title. ` +
+  `Reply with only JSON: {"clusters":[{"title","ids":[...]}]}.`;
+
+const SYNTH_PROMPT = (title: string) =>
+  `You write one overview note about "${title}" for a personal memory store, from the notes below. ${UNTRUSTED}Describe the ` +
+  `CURRENT picture: what it is, the key decisions and why, the current state, and open questions. Prefer the most recent ` +
+  `information. A note marked correction="true" overrides older notes that conflict with it; where notes still conflict, say so ` +
+  `briefly. Use only what the notes say and do not invent anything. Write 4 to 10 short sentences or bullets, at most ` +
+  `${SYNTH_MAX_CHARS} characters. Reply with only JSON: {"title":"...","synthesis":"..."}.`;
+
+type SynthCounts = { created: number; updated: number; skipped: Record<string, number> };
+
+async function synthesize(run_id: string, log: Log): Promise<{ counts: SynthCounts; usage: Usage }> {
+  const counts: SynthCounts = { created: 0, updated: 0, skipped: {} };
+  const usage: Usage = { input: 0, output: 0 };
+  const skip = (why: string) => { counts.skipped[why] = (counts.skipped[why] ?? 0) + 1; };
+  if (MAX_SYNTHESES === 0) return { counts, usage };
+
+  // 1. Eligible notes: processed, ordinary, visible, and not outdated or disputed.
+  const { data: pool } = await supabase.from("thoughts")
+    .select("id,content,summary,topic,created_at")
+    .is("merged_into", null).is("retracted_at", null).neq("source", "dream").eq("sensitivity_tier", "standard")
+    .not("dreamed_at", "is", null).not("summary", "is", null)
+    .order("created_at", { ascending: false }).limit(CLUSTER_POOL);
+  const poolIds = (pool ?? []).map((n) => n.id);
+  if (poolIds.length < MIN_CLUSTER) { skip("too_few_notes"); return { counts, usage }; }
+
+  const { data: ctl } = await supabase.from("thought_links").select("from_id,to_id,kind").in("kind", ["supersedes", "contradicts"])
+    .or(`from_id.in.(${poolIds.join(",")}),to_id.in.(${poolIds.join(",")})`);
+  const outdated = new Set((ctl ?? []).filter((l) => l.kind === "supersedes").map((l) => l.to_id));
+  const contradictTargets = [...new Set((ctl ?? []).filter((l) => l.kind === "contradicts").map((l) => l.to_id))];
+  const correctionIds = new Set<string>();
+  if (contradictTargets.length) {
+    const { data: cs } = await supabase.from("thoughts").select("id").in("id", contradictTargets).ilike("content", "correction%");
+    for (const c of cs ?? []) correctionIds.add(c.id);
+  }
+  const disputed = new Set((ctl ?? []).filter((l) => l.kind === "contradicts" && correctionIds.has(l.to_id)).map((l) => l.from_id));
+  const eligible = (pool ?? []).filter((n) => !outdated.has(n.id) && !disputed.has(n.id));
+  const byId = new Map(eligible.map((n) => [n.id, n]));
+  if (eligible.length < MIN_CLUSTER) { skip("too_few_notes"); return { counts, usage }; }
+
+  // 2. The latest version of each existing overview is given to the model as an anchor, so topics stay stable from one
+  // night to the next instead of being re-drawn (re-drawing made a smaller group replace a bigger overview).
+  const { data: existing } = await supabase.from("thoughts").select("id,topic,created_at,retracted_at")
+    .eq("source", "dream").contains("tags", ["synthesis"]);
+  const synthIds = (existing ?? []).map((s) => s.id);
+  const members = new Map<string, Set<string>>();
+  const supersededSynth = new Set<string>();
+  if (synthIds.length) {
+    const { data: dl } = await supabase.from("thought_links").select("from_id,to_id,kind").in("kind", ["derived_from", "supersedes"]).in("from_id", synthIds);
+    for (const l of dl ?? []) {
+      if (l.kind === "derived_from") members.set(l.from_id, (members.get(l.from_id) ?? new Set()).add(l.to_id));
+      else if (synthIds.includes(l.to_id)) supersededSynth.add(l.to_id);
+    }
+  }
+  const latest = (existing ?? []).filter((s) => !supersededSynth.has(s.id));
+  const norm = (t: string | null) => (t ?? "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  const anchors = latest.map((s) => ({ s, ids: [...(members.get(s.id) ?? [])].filter((id) => byId.has(id)) })).filter((a) => a.ids.length);
+  const anchorText = anchors.length
+    ? "\n\nExisting topics. Keep each as its own group with exactly the same title, add any new notes that fit it, and never " +
+      "split, merge or rename them. Only leftover notes may form new groups:\n" +
+      anchors.map((a) => `- ${a.s.topic} :: ${a.ids.join(" ")}`).join("\n")
+    : "";
+
+  // 3. One cheap call groups the notes into topics.
+  const grouped = await askJson(
+    CLUSTER_PROMPT + anchorText,
+    eligible.map((n) => wrap(n.id, `${n.topic ?? ""}: ${n.summary}`.slice(0, 400), ` written="${n.created_at.slice(0, 10)}"`)).join("\n"),
+  );
+  usage.input += grouped.usage.input; usage.output += grouped.usage.output;
+  const seen = new Set<string>();
+  const clusters: { title: string; ids: string[] }[] = [];
+  for (const c of Array.isArray(grouped.json.clusters) ? grouped.json.clusters.slice(0, 15) : []) {
+    const ids = (Array.isArray(c.ids) ? c.ids : []).filter((id: unknown) => typeof id === "string" && byId.has(id) && !seen.has(id));
+    if (ids.length < MIN_CLUSTER) continue;
+    ids.forEach((id: string) => seen.add(id));
+    clusters.push({ title: clean(c.title, 80) || "Untitled topic", ids });
+  }
+  if (!clusters.length) { skip("no_topics_found"); return { counts, usage }; }
+
+  // 4. Match each group to an existing overview: by title first, then by how much the two overlap (Jaccard 0.5 or more).
+  // An overview is refreshed only when notes were added to its topic; one the user retracted is left alone.
+  const plans = clusters.map((c) => {
+    const ids = new Set(c.ids);
+    let s = latest.find((x) => norm(x.topic) !== "" && norm(x.topic) === norm(c.title)) ?? null;
+    if (!s) {
+      let bestJ = 0;
+      for (const x of latest) {
+        const m = members.get(x.id) ?? new Set<string>();
+        const inter = [...ids].filter((id) => m.has(id)).length;
+        const j = inter / (ids.size + m.size - inter || 1);
+        if (j >= 0.5 && j > bestJ) { bestJ = j; s = x; }
+      }
+    }
+    const m = s ? (members.get(s.id) ?? new Set<string>()) : new Set<string>();
+    const match = s ? { id: s.id, retracted: !!s.retracted_at, m } : null;
+    const added = match ? c.ids.filter((id) => !m.has(id)).length : c.ids.length;
+    return { ...c, match, added };
+  }).filter((p) => {
+    if (p.match?.retracted) { if (p.added < MIN_CLUSTER) { skip("retracted_overview"); return false; } return true; }
+    if (p.match && p.added < MIN_REFRESH_NEW) { skip("up_to_date"); return false; }
+    return true;
+  }).sort((a, b) => b.added - a.added).slice(0, MAX_SYNTHESES);
+  // 4. Write (or refresh) the overviews, side by side.
+  await Promise.all(plans.map(async (p) => {
+    try {
+      const notes = p.ids.map((id) => byId.get(id)!).sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, MAX_CLUSTER_NOTES);
+      const { json, usage: u } = await askJson(
+        SYNTH_PROMPT(p.title),
+        notes.map((n) => wrap(n.id, n.content.slice(0, 600), ` written="${n.created_at.slice(0, 10)}"${/^correction\b/i.test(n.content.trim()) ? ' correction="true"' : ""}`)).join("\n"),
+      );
+      usage.input += u.input; usage.output += u.output;
+      // The note itself starts "Overview of <title>:", so drop a trailing "overview" the model may have put in the title.
+      const title = (clean(json.title, 80) || p.title).replace(/[\s:,-]+overview$/i, "").trim() || p.title;
+      let body = clean(json.synthesis, SYNTH_MAX_CHARS * 2);
+      if (body.length > SYNTH_MAX_CHARS) { const cut = body.slice(0, SYNTH_MAX_CHARS); body = cut.slice(0, Math.max(cut.lastIndexOf(". "), cut.lastIndexOf("\n")) + 1) || cut; }
+      if (!body) { skip("empty_overview"); return; }
+      const content = `Overview of ${title}: ${body}`;
+      const embedding = await embed(content);
+      const { data: row, error } = await supabase.from("thoughts")
+        .insert({ content, embedding, source: "dream", tags: ["synthesis"], topic: title, summary: `Overview of ${title}`, type: "reference", dreamed_at: new Date().toISOString() })
+        .select("id").single();
+      if (error) { skip("could_not_save"); return; }
+      const links = notes.map((n) => ({ from_id: row.id, to_id: n.id, kind: "derived_from", run_id }));
+      if (p.match) links.push({ from_id: row.id, to_id: p.match.id, kind: "supersedes", run_id });
+      await supabase.from("thought_links").upsert(links, { onConflict: "from_id,to_id,kind" });
+      await log({ run_id, thought_id: row.id, action: "synthesis", detail: { title, from: notes.length, refreshed: !!p.match } });
+      if (p.match) counts.updated++; else counts.created++;
+    } catch (e) {
+      skip("model_error");
+      await log({ run_id, action: "aborted", detail: { synthesis: p.title, error: (e as Error).message } });
+    }
+  }));
+  return { counts, usage };
+}
+
 // ---------- entry point ----------
 
 Deno.serve(async (req) => {
@@ -336,7 +495,12 @@ Deno.serve(async (req) => {
   const buffer: object[] = [];
   const log: Log = async (r) => { buffer.push(r); };
   const flush = async () => { if (buffer.length) await supabase.from("dream_log").insert(buffer.splice(0)); };
-  const totals = { processed: 0, links: 0, merged: 0, remaining: 0, digest: false, tokens: { input: 0, output: 0 }, ms: 0 };
+  const totals = {
+    processed: 0, links: 0, merged: 0, remaining: 0, digest: false, tokens: { input: 0, output: 0 }, ms: 0,
+    synthesis: { created: 0, updated: 0, skipped: {} } as SynthCounts,
+  };
+  // ?synthesize=1 writes overviews even when nothing new was processed (for a manual run or the demo).
+  const forceSynth = url.searchParams.get("synthesize") === "1";
 
   try {
     // Restricted memories (secrets) are never sent to a model.
@@ -362,7 +526,13 @@ Deno.serve(async (req) => {
     const { count } = await supabase.from("thoughts").select("id", { count: "exact", head: true })
       .is("dreamed_at", null).is("merged_into", null).is("retracted_at", null).neq("source", "dream").neq("sensitivity_tier", "restricted");
     totals.remaining = count ?? 0;
-    // Call again while `remaining` > 0. The digest waits until the queue is empty.
+    // Call again while `remaining` > 0. Overviews and the digest wait until the queue is empty.
+    if (SYNTH_ENABLED && totals.remaining === 0 && (totals.processed || forceSynth)) {
+      const s = await synthesize(run_id, log);
+      totals.synthesis = s.counts;
+      totals.tokens.input += s.usage.input;
+      totals.tokens.output += s.usage.output;
+    }
     if (totals.remaining === 0 && totals.processed) totals.digest = await digest(run_id, log);
     await flush();
   } catch (e) {

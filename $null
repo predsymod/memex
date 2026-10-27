@@ -1,7 +1,7 @@
 ﻿npx.cmd : Initialising login role...
-At line:27 char:1
-+ npx.cmd --yes supabase db query --linked "delete from sync_cursors wh ...
-+ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+At line:12 char:6
++ $o = npx.cmd --yes supabase db query --linked $q 2>`$null | Out-Strin ...
++      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     + CategoryInfo          : NotSpecified: (Initialising login role...:String) [], RemoteException
     + FullyQualifiedErrorId : NativeCommandError
  

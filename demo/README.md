@@ -43,6 +43,7 @@ phrasing above. If an agent doesn't scope the search, ask it to use the tag `fer
 - "next Saturday" in the cleanup note turned into a real date.
 - A `supersedes` link from the 7am correction to the 8am note, and from the "moved" update to the original cleanup note.
 - The two group-size notes linked as duplicates.
+- An **overview note** of the club ("Overview of Fernwood Trail Club: ...") that states the current facts (7am, not 8am; the cleanup moved) and is linked back to its source notes. It appears once the club has 4 or more related notes. Dreaming writes at most 3 overviews per run; it groups the whole memory, so `reset.mjs` removes every Dreaming note since the last seed, including overviews of real topics. Re-run `node demo/dream.mjs --synthesize` afterwards to rebuild them.
 - A one-paragraph digest. Note: the digest covers every note Dreaming organized in that run, so keep a take to the demo notes plus the favorite-color note.
 
 ## Privacy checklist
