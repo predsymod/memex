@@ -79,6 +79,23 @@ console.log('\n=== A. Fresh install on an empty database');
     const s5 = await q(db, 'select content, superseded, score from search_memex($1, $2::vector, 10, 0.3)', ['quokkas', vec(0)]);
     const a = s5.find((r) => r.content.startsWith('Alpha')), b = s5.find((r) => r.content.startsWith('Beta'));
     check('older note flagged superseded and ranked below the newer', a?.superseded === true && b?.superseded === false && a.score < b.score, JSON.stringify(s5.map((r) => [r.content.slice(0, 5), r.superseded, r.score])));
+    // autosync_match: repeat guard for unattended saves. Only the same source's own auto-sync notes count.
+    await db.query("insert into thoughts (content, embedding, source, tags) values ('Autosave one', $1, 'agentA', array['auto-sync'])", [vec(40)]);
+    await db.query("insert into thoughts (content, embedding, source, tags) values ('Autosave retracted', $1, 'agentA', array['auto-sync'])", [vec(41)]);
+    await db.query("update thoughts set retracted_at = now() where content = 'Autosave retracted'");
+    await db.query("insert into thoughts (content, embedding, source) values ('Typed by the user', $1, 'agentA')", [vec(42)]);
+    await db.query("insert into thoughts (content, embedding, source, tags) values ('Other agent autosave', $1, 'agentB', array['auto-sync'])", [vec(43)]);
+    const m1 = await q(db, "select * from autosync_match('agentA', $1::vector, 0.85)", [vec(40)]);
+    check('autosync_match finds the same source\'s earlier auto-save', m1.length === 1 && m1[0].retracted === false && m1[0].similarity > 0.99);
+    const m2 = await q(db, "select * from autosync_match('agentA', $1::vector, 0.85)", [vec(41)]);
+    check('autosync_match also finds an auto-save the user retracted, and says so', m2.length === 1 && m2[0].retracted === true);
+    check('autosync_match ignores notes the user wrote (no auto-sync tag)', (await q(db, "select * from autosync_match('agentA', $1::vector, 0.85)", [vec(42)])).length === 0);
+    check('autosync_match ignores another source\'s auto-saves', (await q(db, "select * from autosync_match('agentA', $1::vector, 0.85)", [vec(43)])).length === 0);
+    check('autosync_match returns nothing for an unrelated vector', (await q(db, "select * from autosync_match('agentA', $1::vector, 0.85)", [vec(99)])).length === 0);
+    const gp = await q(db, "select has_function_privilege('anon', 'autosync_match(text,vector,float)', 'execute') as a");
+    check('anon cannot execute autosync_match', gp[0].a === false);
+    await db.query("delete from thoughts where source in ('agentA', 'agentB')");
+
     // disputed: a note that contradicts a note beginning "Correction" is flagged and ranks below an untouched note
     await db.query("insert into thoughts (content, embedding, source) values ('Correction: quokkas are marsupials, not rodents', $1, 'claude')", [vec(0)]);
     await db.query("insert into thoughts (content, embedding, source) values ('Quokkas are rodents and eat nuts', $1, 'claude')", [vec(0)]);

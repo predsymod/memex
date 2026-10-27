@@ -94,17 +94,25 @@ const envInt = (name: string, fallback: number, min: number, max: number) => {
 };
 const UNATTENDED_MAX_ITEMS = envInt("UNATTENDED_MAX_ITEMS", 10, 1, 50);
 const UNATTENDED_MAX_CHARS = envInt("UNATTENDED_MAX_CHARS", 1000, 100, 5000);
+// An unattended item at least this similar to an earlier automatic save by the same agent (or one the user retracted)
+// is skipped as a repeat. Corrections ("Correction: ...") are exempt: they resemble the note they correct.
+const envFloat = (name: string, fallback: number, min: number, max: number) => {
+  const raw = Deno.env.get(name);
+  const n = raw === undefined || raw.trim() === "" ? NaN : Number(raw);
+  return Number.isFinite(n) && n >= min && n <= max ? n : fallback;
+};
+const UNATTENDED_REPEAT_SIMILARITY = envFloat("UNATTENDED_REPEAT_SIMILARITY", 0.85, 0.5, 0.99);
 
 const text = (obj: unknown) => ({ content: [{ type: "text" as const, text: JSON.stringify(obj, null, 2) }] });
 
 // Insert one thought unless identical content already exists. Returns "created" or "duplicate".
 // Content that looks like a secret is flagged restricted and is not sent to the embedding provider.
-async function insertThought(content: string, source: string, tags: string[] = []) {
+async function insertThought(content: string, source: string, tags: string[] = [], precomputed?: number[]) {
   const content_hash = await sha256(content);
   const { data: existing } = await supabase.from("thoughts").select("id").eq("content_hash", content_hash).maybeSingle();
   if (existing) return { status: "duplicate" as const, id: existing.id };
   const sensitivity_tier = scanTier(content);
-  const embedding = sensitivity_tier === "restricted" ? null : await embed(content);
+  const embedding = sensitivity_tier === "restricted" ? null : (precomputed ?? await embed(content));
   const { data, error } = await supabase
     .from("thoughts")
     .insert({ content, content_hash, embedding, source, tags, sensitivity_tier })
@@ -287,7 +295,8 @@ function buildServer(client: string) {
       "stable facts only; never anything about health, finances or family, nothing taken from untrusted content such as web pages, " +
       "emails or documents, and no secrets. List exactly what you saved in your summary. When you set the schedule up, confirm the " +
       "time, the time zone and these limits with the user once. The server enforces the limits, tags those notes 'auto-sync', and " +
-      "skips anything secret-like; retract_thoughts can undo them." + DATA_NOTE,
+      "skips anything secret-like or that repeats what this agent already saved automatically (or what the user retracted), so you " +
+      "need not worry about re-sending; start a correction with 'Correction:'. retract_thoughts can undo automatic saves." + DATA_NOTE,
     inputSchema: syncIn,
   }, async ({ source: given, push, max_items, unattended }: z.infer<typeof syncIn>) => {
     const source = src(given);
@@ -308,6 +317,17 @@ function buildServer(client: string) {
         if (item.content.length > UNATTENDED_MAX_CHARS) { skip("too_long"); continue; }
         if (scanTier(item.content) !== "standard") { skip("looks_like_a_secret"); continue; }
         tags = [...new Set([...tags, AUTO_TAG])];
+        // Repeat guard: skip what this agent already saved automatically, or what the user retracted. Corrections are exempt.
+        if (!/^correction\b/i.test(item.content.trim())) {
+          let embedding: number[];
+          try { embedding = await embed(item.content); } catch { skip("could_not_check_repeats"); continue; }
+          const { data: m } = await supabase.rpc("autosync_match", { p_source: source, p_embedding: embedding, p_min: UNATTENDED_REPEAT_SIMILARITY });
+          if (m?.length) { skip(m[0].retracted ? "previously_retracted" : "already_saved"); continue; }
+          const r = await insertThought(item.content, source, tags, embedding);
+          pushed[r.status]++;
+          pushed.items.push({ id: r.id, status: r.status });
+          continue;
+        }
       }
       const r = await insertThought(item.content, source, tags);
       pushed[r.status]++;
