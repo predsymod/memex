@@ -20,6 +20,7 @@ Memex holds personal memory, so it is built to fail closed. This page says what 
 - **Secret detection is pattern-based.** It catches common key formats, long hex strings, card and ID numbers and "password is ..." phrasing. It will miss unusual secrets and flag some harmless text. Do not rely on it as the only safeguard.
 - **Memories leave your project for processing.** Text goes to your embeddings provider, and to your Dreaming model provider if you enable it. Restricted memories do not.
 - **Unattended saves rely partly on the agent's judgment.** The server caps their number and size and blocks secret-like text, but it cannot tell whether a note is personal or came from untrusted content; that part depends on the agent following its instructions. This is why the user's opt-in, the daily summary of what was saved, and the retract tool exist.
+- **Per-agent sync preferences are enforced by the agent, not the server.** What each agent may save (work, family, health and so on) is recorded as an ordinary note tagged `sync-prefs`, and agents are told that only the user, in chat, can set it. A manipulated agent could still be talked into saving a wrong preference, or into ignoring one. The server's hard limits do not depend on preferences: secret-like text is never saved or sent to a model, and unattended runs stay capped. Check what your agents recorded with `list_thoughts` and the tag `sync-prefs`.
 - **There is no rate limiting** beyond what Supabase applies. A valid key could run up provider costs.
 
 ## Reporting a vulnerability
