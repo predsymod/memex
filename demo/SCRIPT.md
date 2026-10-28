@@ -8,9 +8,12 @@ Story in one line: **save a fact in one agent, get it in another, watch Meta's m
 
 1. `node scripts/doctor.mjs` is all green.
 2. `node demo/reset.mjs --live` for a clean slate. **Warning:** it removes every Dreaming note written since the last seed, including the overviews of your real topics. After the take run `node demo/dream.mjs --synthesize` to rebuild them.
-3. `node demo/preflight.mjs claude muse` so a pull in Muse only brings the one new note.
-4. `node demo/seed.mjs` (nine fictional "Fernwood Trail Club" notes).
-5. Rehearse the Muse beat in a **new** Muse chat (not your main one) until it behaves twice in a row.
+3. `node demo/dream.mjs` **off camera, before seeding.** Dreaming's digest covers every note it organizes in a run. If real notes from a morning sync are still waiting (a dry run found 16), the on-camera run takes about 40 seconds instead of about 20 and the digest would be about your real notes. Running it once first clears them, so the take covers only the demo notes.
+4. `node demo/preflight.mjs claude muse` so a pull in Muse only brings the one new note.
+5. `node demo/seed.mjs` (nine fictional "Fernwood Trail Club" notes).
+6. Rehearse the Muse beat in a **new** Muse chat (not your main one) until it behaves twice in a row.
+
+A tool-level dry run (save in Claude, pull in Muse, recall, the fake password, Dreaming, the superseded note and the overview) passed on 2026-10-28. It does not cover how Claude and Muse behave in their chat windows, so rehearse those.
 
 ### Keep off camera
 - The claude.ai connector detail page (the key is in its URL), and any Supabase API-keys page.
