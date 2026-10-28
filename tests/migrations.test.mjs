@@ -1,6 +1,5 @@
 import { PGlite } from '@electric-sql/pglite';
 import { vector } from '@electric-sql/pglite-pgvector';
-import { pgcrypto } from '@electric-sql/pglite/contrib/pgcrypto';
 import fs from 'node:fs';
 
 // Runs every migration on a throwaway in-process Postgres (PGlite): once on an empty database, and once on top of the
@@ -17,7 +16,9 @@ const check = (name, ok, detail = '') => {
 const vec = (i) => '[' + Array.from({ length: 1536 }, (_, k) => (k === i ? 1 : 0)).join(',') + ']';
 
 async function fresh() {
-  const db = new PGlite({ extensions: { vector, pgcrypto } });
+  // No pgcrypto on purpose: on Supabase it lives in the `extensions` schema, off the migration search path, so a
+  // migration that calls digest() works here with it loaded and then fails on a fresh project.
+  const db = new PGlite({ extensions: { vector } });
   await db.exec('create role anon nologin; create role authenticated nologin;'); // exist on Supabase
   return db;
 }

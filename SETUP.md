@@ -15,7 +15,7 @@ The user asked you to set up Memex, a personal memory they own and any agent can
 Check that `git --version` and either `supabase --version` or `npx supabase --version` work. If the Supabase CLI is missing, `npx supabase` is enough. Deno is optional, only for type-checking.
 
 ## 2. Accounts (HUMAN)
-- A Supabase account and a new, empty project. Ask for the project ref (the id in the project URL). Free projects pause after about a week of inactivity.
+- A Supabase account and a new, empty project. Ask for the project ref (the id in the project URL). Free projects pause after about a week of inactivity. When creating the project, the defaults are fine; unchecking "Automatically expose new tables" is good hygiene (Memex locks its own tables down either way).
 - An OpenRouter account with a little credit, and an API key. It is used for embeddings (fractions of a cent per thousand thoughts).
 - Optional, for Dreaming: a Meta Model API key from https://dev.meta.ai. Dreaming sends new memories to that provider, so tell the user this before enabling it.
 
@@ -28,16 +28,16 @@ Clone this repo into a new folder and enter it.
 ```
 supabase login            # HUMAN: opens a browser
 supabase link --project-ref <PROJECT_REF>
-supabase db push          # applies supabase/migrations/0001 to 0005 in order
+supabase db push --linked # applies every file in supabase/migrations in order (0001 to 0006 at the time of writing)
 ```
-If `db push` asks for the database password, the user sets or resets it in the dashboard (Project Settings → Database). The migrations are idempotent and safe to re-run.
+`db push` normally needs no database password, because the CLI signs in with a temporary role. If it does ask, the user sets or resets it in the dashboard (Project Settings → Database). The migrations are idempotent and safe to re-run.
 Verify: the `thoughts`, `thought_links`, `sync_cursors` and `dream_log` tables exist.
 
 ## 5. Generate the access key
 Run `scripts/generate-key.sh` (or `scripts/generate-key.ps1` on Windows). Show it to the user once and tell them to save it in a password manager, and put it in `.env` as `MCP_ACCESS_KEY`.
 
 ## 6. Set secrets
-Have the user fill in `.env` (copy `.env.example`; it is git-ignored) with `MCP_ACCESS_KEY` and `OPENROUTER_API_KEY`, then:
+Have the user fill in `.env` (copy `.env.example`; it is git-ignored) with `MCP_ACCESS_KEY` and `OPENROUTER_API_KEY`. Every `NAME=` line in the file is sent as a secret, so a blank one becomes an empty secret: delete the lines you are not using (or leave them commented out). If the user later changes a secret in the dashboard, that is fine too; saving a new value under the same name replaces it. Then:
 ```
 supabase secrets set --env-file .env
 ```
@@ -60,7 +60,7 @@ The server URL is `https://<PROJECT_REF>.supabase.co/functions/v1/memex-mcp`.
 - Give each tool its own copy of the key; there is no per-tool setup on the server.
 
 ## 9. Verify
-Call `capture_thought` with "Memex setup test", then `search_thoughts` for "setup test". Both must succeed. Then delete the test thought, or tell the user it is safe to delete. Tell the user setup is done and that they can say "sync memex" in any agent (see SYNC.md).
+Call `capture_thought` with "Memex setup test", then `search_thoughts` for "setup test". Both must succeed. (If `capture_thought` says `embedding failed: 401`, the `OPENROUTER_API_KEY` secret is missing or wrong. The doctor can't catch this, because search quietly falls back to keywords when embeddings are down.) Then delete the test thought, or tell the user it is safe to delete. Tell the user setup is done and that they can say "sync memex" in any agent (see SYNC.md).
 
 ## 10. Optional: Dreaming
 A nightly job that tags, summarizes and connects memories. Skip it if the user has no Meta or OpenRouter key; Memex works without it.

@@ -16,7 +16,7 @@ Tell your agent: **"Set up a Memex for me using this repo"** and it follows [SET
 
 ## Status
 
-Work in progress for the Meta AI Developer Hackathon (Oct 26 to Nov 4, 2026). Everything in this repository was written during the hackathon. It is not yet tested end to end on a brand-new Supabase project; the database migrations are tested on an empty database and on the old Open Brain table shape (see below).
+Work in progress for the Meta AI Developer Hackathon (Oct 26 to Nov 4, 2026). Everything in this repository was written during the hackathon. The setup was tested end to end on a brand-new Supabase project (which found and fixed a migration bug); the database migrations are also tested on an empty database and on the old Open Brain table shape (see below).
 
 ## Layout
 

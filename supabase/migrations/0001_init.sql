@@ -3,7 +3,6 @@
 -- Raw thoughts are the source of truth; Dreaming only adds metadata and links.
 
 create extension if not exists vector;
-create extension if not exists pgcrypto;
 
 create table if not exists thoughts (
   id         uuid primary key default gen_random_uuid(),
@@ -25,9 +24,10 @@ alter table thoughts add column if not exists dreamed_at   timestamptz;         
 alter table thoughts add column if not exists retracted_at timestamptz;
 
 -- Backfill rows that predate these columns. The hash normalization matches the edge function:
--- trim, collapse whitespace, lowercase.
+-- trim, collapse whitespace, lowercase. Uses the built-in sha256(): pgcrypto's digest() lives in the `extensions`
+-- schema on Supabase and is not on the migration's search path, so it would fail on a fresh project.
 update thoughts
-   set content_hash = encode(digest(lower(regexp_replace(btrim(content), '\s+', ' ', 'g')), 'sha256'), 'hex')
+   set content_hash = encode(sha256(convert_to(lower(regexp_replace(btrim(content), '\s+', ' ', 'g')), 'UTF8')), 'hex')
  where content_hash is null;
 
 update thoughts
@@ -42,7 +42,7 @@ update thoughts
 create or replace function thoughts_set_hash() returns trigger language plpgsql as $$
 begin
   if new.content_hash is null then
-    new.content_hash := encode(digest(lower(regexp_replace(btrim(new.content), '\s+', ' ', 'g')), 'sha256'), 'hex');
+    new.content_hash := encode(sha256(convert_to(lower(regexp_replace(btrim(new.content), '\s+', ' ', 'g')), 'UTF8')), 'hex');
   end if;
   return new;
 end $$;

@@ -74,7 +74,7 @@ try {
 
 try {
   const hits = JSON.parse(await tool("search_thoughts", { query: "memex doctor check", limit: 1 }));
-  note(Array.isArray(hits), "search works", "embeddings and the search function respond");
+  note(Array.isArray(hits), "search works", "the search function responds (if embeddings are down it falls back to keywords; the capture_thought check in SETUP.md step 9 confirms them)");
 } catch (e) { note(false, "search works", e.message + " (check OPENROUTER_API_KEY and migration 0005)"); }
 
 try {
