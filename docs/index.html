@@ -10,105 +10,149 @@
 <meta name="referrer" content="no-referrer">
 <style>
   :root {
-    --bg: #fbfaf7; --surface: #ffffff; --ink: #1c1b19; --muted: #5d5a54; --line: #e6e2d9;
-    --accent: #b4521f; --accent-ink: #ffffff; --soft: #f3efe6; --code-bg: #1f1d1a; --code-ink: #f1ece2;
-    --ok: #2f7d4f;
+    --cobalt: #2a3fd6; --chalk: #e9ecf8; --ink: #0c1030; --muted: #484d6b; --bg: #eef0f6; --card: #ffffff;
+    --rule: #cdd2ea; --tint: #e6e9f5; --amber: #ffb400; --accent: #2a3fd6;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   }
   @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #151412; --surface: #1d1b18; --ink: #f1ece2; --muted: #a8a299; --line: #2e2b26;
-      --accent: #e0834f; --accent-ink: #1a1209; --soft: #1f1d1a; --code-bg: #0f0e0c; --code-ink: #f1ece2;
-      --ok: #6cc592;
-    }
+    :root { --bg: #0f1530; --card: #171f42; --ink: #eef0fb; --muted: #aab0d2; --rule: #2b3563; --tint: #1d2650; --accent: #9fb0ff; --cobalt: #2336c0; }
   }
   * { box-sizing: border-box; }
-  html { -webkit-text-size-adjust: 100%; }
-  body {
-    margin: 0; background: var(--bg); color: var(--ink);
-    font: 17px/1.6 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  }
-  .wrap { max-width: 920px; margin: 0 auto; padding: 0 20px; }
-  header.top { padding: 22px 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-  .brand { font-weight: 700; letter-spacing: -0.02em; font-size: 20px; }
-  .brand span { color: var(--accent); }
-  nav a { color: var(--muted); text-decoration: none; margin-left: 18px; font-size: 15px; }
-  nav a:hover, nav a:focus-visible { color: var(--ink); text-decoration: underline; }
-  .hero { padding: 40px 0 28px; }
-  .badge {
-    display: inline-block; font-size: 13px; padding: 3px 10px; border: 1px solid var(--line);
-    border-radius: 999px; color: var(--muted); background: var(--surface);
-  }
-  h1 { font-size: clamp(34px, 6vw, 56px); line-height: 1.08; letter-spacing: -0.03em; margin: 16px 0 14px; }
-  .lede { font-size: 20px; color: var(--muted); max-width: 640px; margin: 0 0 26px; }
-  .prompt {
-    display: flex; align-items: stretch; gap: 0; background: var(--code-bg); color: var(--code-ink);
-    border-radius: 12px; overflow: hidden; max-width: 720px;
-  }
-  .prompt code { flex: 1; padding: 16px 18px; font: 15px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; overflow-wrap: anywhere; }
-  .prompt button {
-    border: 0; background: var(--accent); color: var(--accent-ink); font: inherit; font-weight: 600;
-    padding: 0 20px; cursor: pointer; min-width: 92px;
-  }
-  .prompt button:hover { filter: brightness(1.08); }
-  button:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
-  .hint { color: var(--muted); font-size: 15px; margin: 10px 0 0; }
-  section { padding: 34px 0; }
-  h2 { font-size: 28px; letter-spacing: -0.02em; margin: 0 0 8px; }
-  .sub { color: var(--muted); margin: 0 0 22px; max-width: 660px; }
-  .cards { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); }
-  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 20px; }
-  .card h3 { margin: 0 0 6px; font-size: 18px; }
+  html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 17px/1.6 var(--sans); }
+  a { color: var(--accent); text-underline-offset: 3px; }
+  a:focus-visible, button:focus-visible { outline: 3px solid var(--amber); outline-offset: 3px; border-radius: 4px; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+
+  /* the cobalt field */
+  .field { background: var(--cobalt); color: #fff; }
+  .field a { color: #fff; }
+  header.top { padding: 22px 0; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+  .brand { font-weight: 800; font-size: 22px; letter-spacing: -0.03em; }
+  nav a { text-decoration: none; margin-left: 22px; font-size: 15px; opacity: .85; }
+  nav a:hover { opacity: 1; text-decoration: underline; }
+  .hero { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 48px; padding: 40px 0 72px; align-items: start; }
+  .exchange { margin-top: 34px; }
+  .status { font-size: 15px; opacity: .85; margin: 0 0 20px; }
+  h1 { font-weight: 800; font-size: clamp(38px, 5vw, 66px); line-height: 1; letter-spacing: -0.045em; margin: 0 0 22px; }
+  .lede { font-size: 19px; color: var(--chalk); max-width: 31em; margin: 0 0 30px; }
+  .prompt { display: flex; background: #0c1030; border-radius: 4px; overflow: hidden; }
+  .prompt code { flex: 1; padding: 15px 18px; font: 14.5px/1.5 var(--mono); color: #fff; overflow-wrap: anywhere; }
+  .prompt button { border: 0; background: #fff; color: var(--cobalt); font: 700 15px var(--sans); padding: 0 24px; cursor: pointer; min-width: 96px; }
+  .prompt button:hover { background: var(--chalk); }
+  .hint { color: var(--chalk); font-size: 15px; margin: 12px 0 0; }
+
+  /* the proof: one fact moving between two agents */
+  .exchange { display: grid; gap: 12px; margin: 34px 0 0; }
+  .win { background: var(--card); color: var(--ink); border-radius: 6px; overflow: hidden; box-shadow: 0 1px 0 rgba(12, 16, 48, .25); }
+  .win-bar { padding: 8px 14px; font-size: 13px; color: var(--muted); border-bottom: 1px solid var(--rule); background: var(--tint); }
+  .win-body { padding: 14px 16px 16px; display: grid; gap: 10px; font-size: 15.5px; }
+  .you { font-family: var(--mono); font-size: 14px; }
+  .you::before { content: "you  "; color: var(--muted); }
+  .bot { color: var(--muted); }
+  .bot::before { content: "agent  "; font-family: var(--mono); font-size: 14px; }
+  mark { background: linear-gradient(var(--amber), var(--amber)) no-repeat left / 100% 100%; color: #1a1300; font-weight: 700; padding: 1px 5px; border-radius: 2px; }
+  .via { justify-self: center; font-size: 13.5px; color: var(--chalk); display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .via::before, .via::after { content: ""; width: 1px; height: 14px; background: rgba(255, 255, 255, .55); }
+
+  main section { padding: 52px 0; border-top: 1px solid var(--rule); }
+  main section:first-child { border-top: 0; }
+  h2 { font: 700 clamp(26px, 3.4vw, 36px)/1.15 var(--serif); letter-spacing: -0.01em; margin: 0 0 10px; }
+  .sub { color: var(--muted); max-width: 42em; margin: 0 0 30px; }
+
+  /* cards with a tab that says what the card holds */
+  .cards { display: grid; gap: 28px 20px; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); }
+  .card { position: relative; background: var(--card); border: 1px solid var(--rule); border-radius: 0 6px 6px 6px; padding: 24px 22px 20px; margin-top: 26px; }
+  .tab { position: absolute; left: -1px; top: -27px; background: var(--card); border: 1px solid var(--rule); border-bottom: 0; border-radius: 6px 6px 0 0; padding: 4px 14px 3px; font-size: 14px; font-weight: 700; color: var(--accent); }
+  .card h3 { font: 700 20px/1.25 var(--serif); margin: 0 0 8px; }
   .card p { margin: 0 0 12px; color: var(--muted); font-size: 16px; }
-  .say { font: 14px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: var(--soft); border-radius: 8px; padding: 10px 12px; color: var(--ink); overflow-wrap: anywhere; }
-  .tag { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--accent); font-weight: 700; }
-  figure { margin: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 18px; }
-  figure { overflow-x: auto; }
-  figure svg { width: 100%; min-width: 600px; height: auto; display: block; }
-  figcaption { color: var(--muted); font-size: 15px; margin-top: 8px; }
-  .facts { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); margin-top: 6px; }
-  .fact { border-left: 3px solid var(--accent); padding: 4px 0 4px 14px; }
-  .fact b { display: block; font-size: 22px; letter-spacing: -0.02em; }
-  .fact span { color: var(--muted); font-size: 15px; }
-  ul.plain { padding-left: 20px; margin: 0; }
-  ul.plain li { margin: 6px 0; }
-  .note { background: var(--soft); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; color: var(--muted); font-size: 16px; }
-  footer { padding: 34px 0 56px; color: var(--muted); font-size: 15px; border-top: 1px solid var(--line); margin-top: 24px; }
-  a { color: var(--accent); }
-  @media (max-width: 560px) { .prompt { flex-direction: column; } .prompt button { padding: 12px; } nav { display: none; } }
-  @media (prefers-reduced-motion: no-preference) { .prompt button { transition: filter .15s; } }
+  .say { font: 14px/1.5 var(--mono); background: var(--tint); border-left: 3px solid var(--cobalt); padding: 9px 12px; overflow-wrap: anywhere; }
+
+  .note { background: var(--card); border-left: 4px solid var(--cobalt); padding: 16px 20px; color: var(--muted); font-size: 16px; margin: 28px 0 0; max-width: 52em; }
+  .note b { color: var(--ink); }
+  ul.plain { padding-left: 20px; margin: 0; max-width: 46em; } ul.plain li { margin: 9px 0; }
+  .facts { display: grid; gap: 20px; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); margin-top: 30px; }
+  .facts div { border-top: 3px solid var(--cobalt); padding-top: 10px; }
+  .facts b { display: block; font: 700 21px var(--serif); }
+  .facts span { color: var(--muted); font-size: 15.5px; }
+
+  figure.arch { margin: 0; background: var(--card); border: 1px solid var(--rule); border-radius: 6px; padding: 18px; overflow-x: auto; }
+  figure.arch svg { width: 100%; min-width: 600px; height: auto; display: block; color: var(--ink); }
+  figure.arch figcaption { color: var(--muted); font-size: 15px; margin-top: 8px; }
+
+  footer { background: #0c1030; color: var(--chalk); padding: 38px 0 60px; font-size: 15px; }
+  footer a { color: #fff; }
+  footer p { max-width: 48em; margin: 0; }
+  @media (prefers-color-scheme: dark) { footer { background: #0a0e24; } }
+
+  @media (max-width: 880px) { .hero { grid-template-columns: 1fr; gap: 40px; padding-bottom: 56px; } }
+  @media (max-width: 560px) { nav { display: none; } .prompt { flex-direction: column; } .prompt button { padding: 14px; } }
+  @media (prefers-reduced-motion: no-preference) {
+    .prompt button { transition: background .15s; }
+    /* the one automatic moment: the saved fact gets highlighted as the page opens */
+    mark { background-size: 0 100%; animation: wipe .9s .6s ease-out forwards; }
+    @keyframes wipe { to { background-size: 100% 100%; } }
+  }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <header class="top">
-    <div class="brand">Mem<span>ex</span></div>
-    <nav><a href="#how">How it works</a><a href="#dreaming">Dreaming</a><a href="#yours">Your data</a><a class="repo-link" href="https://github.com/predsymod/memex">GitHub</a></nav>
-  </header>
-
-  <main>
+<div class="field">
+  <div class="wrap">
+    <header class="top">
+      <div class="brand">Memex</div>
+      <nav><a href="#how">How it works</a><a href="#dreaming">Dreaming</a><a href="#yours">Your data</a><a class="repo-link" href="https://github.com/predsymod/memex">GitHub</a></nav>
+    </header>
     <div class="hero">
-      <span class="badge">Open source · work in progress</span>
-      <h1>Your repo remembers the code. Memex remembers you.</h1>
-      <p class="lede">The durable context about you and your work, like preferences, decisions and background, shouldn't live inside one AI app. Keep it in your own database and let any agent use it.</p>
-      <div class="prompt">
-        <code id="prompt-text">Hi agent, set up Memex for me. Follow the instructions in SETUP.md at https://github.com/predsymod/memex</code>
-        <button id="copy" type="button" aria-label="Copy the setup prompt">Copy</button>
+      <div>
+        <p class="status">Open source. Work in progress.</p>
+        <h1>Your repo remembers the code. Memex remembers you.</h1>
+        <p class="lede">The durable context about you and your work, like preferences, decisions and background, shouldn't live inside one AI app. Keep it in your own database and let any agent use it.</p>
+        <div class="prompt">
+          <code id="prompt-text">Hi agent, set up Memex for me. Follow the instructions in SETUP.md at https://github.com/predsymod/memex</code>
+          <button id="copy" type="button" aria-label="Copy the setup prompt">Copy</button>
+        </div>
+        <p class="hint">Paste that into any coding agent. It walks you through the setup and does the typing for you.</p>
       </div>
-      <p class="hint">Paste that into any coding agent. It walks you through the setup and does the typing for you.</p>
-    </div>
 
+      <figure class="exchange" aria-label="An example: a fact saved in Claude is recalled in Muse">
+        <div class="win">
+          <div class="win-bar">In Claude, on Monday</div>
+          <div class="win-body">
+            <div class="you">save to memex: my favorite color is <mark>red</mark></div>
+            <div class="bot">Saved to Memex.</div>
+          </div>
+        </div>
+        <div class="via">kept in your own database</div>
+        <div class="win">
+          <div class="win-bar">In Muse, on Friday</div>
+          <div class="win-body">
+            <div class="you">hi, sync memex</div>
+            <div class="bot">One new note from Claude. Pulled.</div>
+            <div class="you">what's my favorite color?</div>
+            <div class="bot"><mark>Red.</mark> You saved that from Claude on Monday.</div>
+          </div>
+        </div>
+      </figure>
+    </div>
+  </div>
+</div>
+
+<div class="wrap">
+  <main>
     <section aria-labelledby="holds">
       <h2 id="holds">What goes in Memex</h2>
       <p class="sub">The durable, cross-cutting context that every tool should know, and that no single repo can hold.</p>
       <div class="cards">
         <div class="card">
-          <span class="tag">Yes</span>
+          <span class="tab">Keeps</span>
           <h3>What follows you</h3>
           <p>Your preferences and how you like to work, decisions and the reasons behind them, corrections, people and plans, and stable background on your products and projects.</p>
         </div>
         <div class="card">
-          <span class="tag">Not here</span>
-          <h3>What lives in the repo</h3>
+          <span class="tab">Leaves to the repo</span>
+          <h3>What lives with the code</h3>
           <p>Code-specific context, status updates and to-dos stay in your repo, <code>CLAUDE.md</code> or <code>AGENTS.md</code>. Agents are told to leave them out of Memex.</p>
         </div>
       </div>
@@ -119,19 +163,19 @@
       <p class="sub">Memex is an MCP server that runs on your own Supabase project. Agents connect to it, and the instructions they follow are plain text in the repo.</p>
       <div class="cards">
         <div class="card">
-          <span class="tag">Setup</span>
+          <span class="tab">Setup</span>
           <h3>Point an agent at the repo</h3>
           <p>It creates the tables, deploys the server and connects itself. You approve the steps that need an account.</p>
           <div class="say">"Set up Memex. Follow SETUP.md in the repo."</div>
         </div>
         <div class="card">
-          <span class="tag">Sync</span>
+          <span class="tab">Sync</span>
           <h3>One memory, every agent</h3>
-          <p>An agent pushes what it knows that is worth keeping and pulls what the others learned, without duplicates. You review what it pushes.</p>
+          <p>An agent pushes what it knows that is worth keeping and pulls what the others learned, without duplicates. You decide, for each agent, what it may save.</p>
           <div class="say">"Sync memex."</div>
         </div>
         <div class="card">
-          <span class="tag">Invoke</span>
+          <span class="tab">Invoke</span>
           <h3>Use it in your work</h3>
           <p>Search blends meaning with exact words, favors recent notes when you ask, and shows the current version of anything that was corrected.</p>
           <div class="say">"Review memex, then draft the plan."</div>
@@ -141,46 +185,46 @@
 
     <section id="handsoff">
       <h2>Hands-off, if you want it</h2>
-      <p class="sub">Ask any agent that can run scheduled tasks to keep you in sync. Say it once, and every morning it catches up on what your other agents saved, and, if you choose, saves what it learned. Nothing for you to do.</p>
+      <p class="sub">Ask any agent that can run scheduled tasks to keep you in sync. Say it once, and every morning it catches up on what your other agents saved and, if you choose, saves what it learned.</p>
       <div class="cards">
         <div class="card">
-          <span class="tag">Stay current</span>
-          <h3>Pull every morning</h3>
+          <span class="tab">Pull only</span>
+          <h3>Stay current</h3>
           <div class="say">"Sync memex every morning at 7."</div>
           <p style="margin-top:12px">Fetches what your other agents saved and gives you a short summary. Nothing is saved, so nothing needs approving.</p>
         </div>
         <div class="card">
-          <span class="tag">Stay in sync</span>
-          <h3>Pull and save</h3>
+          <span class="tab">Pull and save</span>
+          <h3>Stay in sync</h3>
           <div class="say">"Sync memex every morning and save what's worth keeping."</div>
           <p style="margin-top:12px">Your yes at setup is the standing approval. Each run it saves a few durable decisions, lessons and facts, and tells you exactly what it saved.</p>
         </div>
       </div>
-      <p class="note" style="margin-top:16px"><b>Built so it stays safe while you're not watching.</b> The server itself caps an unattended run at a small number of short notes (10 by default, and you can change it), skips anything that looks like a secret, skips repeats of what it already saved (or what you retracted), and tags every note it saves. Agents are told to leave out anything about health, finances or family, and anything taken from web pages or emails. If a save was wrong, "retract what you saved this morning" hides those notes, and only those, and they can be restored. Nothing is ever deleted.</p>
+      <p class="note"><b>Built so it stays safe while you're not watching.</b> The server itself caps an unattended run at a small number of short notes (10 by default, and you can change it), skips anything that looks like a secret, skips repeats of what it already saved (or what you retracted), and tags every note it saves. Agents are told to leave out anything taken from web pages or emails. If a save was wrong, "retract what you saved this morning" hides those notes, and only those, and they can be restored. Nothing is ever deleted.</p>
     </section>
 
     <section aria-labelledby="arch">
       <h2 id="arch">How the pieces fit</h2>
-      <figure>
+      <figure class="arch">
         <svg viewBox="0 0 760 220" role="img" aria-label="Agents such as Claude, Muse, Codex and Cursor connect through MCP to the Memex server on your Supabase project, which stores memories in Postgres with vectors. A nightly Dreaming job organizes them.">
           <g font-family="ui-sans-serif, system-ui, sans-serif" font-size="15" fill="currentColor">
-            <g stroke="var(--line)" stroke-width="1.5" fill="var(--soft)">
-              <rect x="10" y="14" width="150" height="38" rx="9"/><rect x="10" y="62" width="150" height="38" rx="9"/>
-              <rect x="10" y="110" width="150" height="38" rx="9"/><rect x="10" y="158" width="150" height="38" rx="9"/>
-              <rect x="250" y="60" width="200" height="100" rx="14" fill="var(--surface)" stroke="var(--accent)" stroke-width="2"/>
-              <rect x="540" y="14" width="210" height="76" rx="14" fill="var(--surface)"/>
-              <rect x="540" y="116" width="210" height="76" rx="14" fill="var(--surface)"/>
+            <g stroke="var(--rule)" stroke-width="1.5" fill="var(--tint)">
+              <rect x="10" y="14" width="150" height="38" rx="4"/><rect x="10" y="62" width="150" height="38" rx="4"/>
+              <rect x="10" y="110" width="150" height="38" rx="4"/><rect x="10" y="158" width="150" height="38" rx="4"/>
+              <rect x="250" y="60" width="200" height="100" rx="4" fill="var(--card)" stroke="var(--cobalt)" stroke-width="3"/>
+              <rect x="540" y="14" width="210" height="76" rx="4" fill="var(--card)"/>
+              <rect x="540" y="116" width="210" height="76" rx="4" fill="var(--card)"/>
             </g>
             <g text-anchor="middle">
               <text x="85" y="39">Claude</text><text x="85" y="87">Muse</text><text x="85" y="135">Codex</text><text x="85" y="183">Cursor, others</text>
               <text x="350" y="100" font-weight="700">Memex server</text>
-              <text x="350" y="122" fill="var(--muted)" font-size="13">MCP over HTTPS · your key</text>
+              <text x="350" y="122" fill="var(--muted)" font-size="13">MCP over HTTPS, your key</text>
               <text x="645" y="48" font-weight="700">Your Supabase</text>
               <text x="645" y="70" fill="var(--muted)" font-size="13">Postgres + vectors</text>
               <text x="645" y="150" font-weight="700">Dreaming</text>
               <text x="645" y="172" fill="var(--muted)" font-size="13">nightly, optional</text>
             </g>
-            <g stroke="var(--accent)" stroke-width="2" fill="none" stroke-linecap="round">
+            <g stroke="var(--cobalt)" stroke-width="2.5" fill="none" stroke-linecap="round">
               <path d="M160 33 L250 85"/><path d="M160 81 L250 100"/><path d="M160 129 L250 120"/><path d="M160 177 L250 138"/>
               <path d="M450 95 L540 60"/><path d="M645 116 L645 90"/>
             </g>
@@ -191,7 +235,7 @@
     </section>
 
     <section id="dreaming">
-      <h2>Dreaming <span class="badge">optional</span></h2>
+      <h2>Dreaming, if you turn it on</h2>
       <p class="sub">A nightly job reads what you saved since the last run and organizes it. It never deletes or rewrites what you wrote. Everything it changes is logged and can be undone.</p>
       <ul class="plain">
         <li><b>Tags, summaries and types</b> for every memory, with relative dates like "next Friday" turned into real dates.</li>
@@ -200,10 +244,10 @@
         <li><b>Overviews.</b> When enough notes pile up about one topic, Dreaming writes a single note of the current picture: what it is, what was decided, where it stands. It's linked back to its sources and rewritten when new notes join.</li>
         <li><b>A short digest</b> of what changed.</li>
       </ul>
-      <div class="facts" style="margin-top:22px">
-        <div class="fact"><b>115 → 40 s</b><span>one pass over a real personal memory of 115 notes</span></div>
-        <div class="fact"><b>Under $1</b><span>for that first pass; pennies a day after</span></div>
-        <div class="fact"><b>Off by default</b><span>it only runs if you add a model API key</span></div>
+      <div class="facts">
+        <div><b>115 notes, 40 seconds</b><span>one pass over a real personal memory</span></div>
+        <div><b>Under $1</b><span>for that first pass; pennies a day after</span></div>
+        <div><b>Off by default</b><span>it only runs if you add a model API key</span></div>
       </div>
     </section>
 
@@ -215,19 +259,21 @@
         <li>Anything that looks like a secret (keys, tokens, card or ID numbers) is flagged, never sent to a model, and hidden from search and sync.</li>
         <li>Agents are told to treat memories as evidence, never as instructions.</li>
       </ul>
-      <p class="note" style="margin-top:18px"><b>One thing to know:</b> memories are sent to an embeddings provider so they can be searched by meaning, and to a model provider if you enable Dreaming. You choose the providers, and the repo says exactly what is sent.</p>
+      <p class="note"><b>One thing to know:</b> memories are sent to an embeddings provider so they can be searched by meaning, and to a model provider if you enable Dreaming. You choose the providers, and the repo says exactly what is sent.</p>
     </section>
 
     <section>
       <h2>Works with</h2>
-      <p class="sub">Tested with Claude and Muse, reading and writing the same memory. Any agent that supports MCP over HTTP should work: Codex, Cursor, VS Code and others connect with a URL and a key.</p>
+      <p class="sub" style="margin:0">Tested with Claude and Muse, reading and writing the same memory. Any agent that supports MCP over HTTP should work: Codex, Cursor, VS Code and others connect with a URL and a key.</p>
     </section>
   </main>
-
-  <footer>
-    <p>Memex is building on the excellent <a href="https://github.com/NateBJones-Projects/OB1">Open Brain</a> project by Nate B. Jones, and on an earlier write-up, <a href="https://muzayan.substack.com/p/liberating-memory">Liberating memory</a>. Source and setup instructions are on <a class="repo-link" href="https://github.com/predsymod/memex">GitHub</a>.</p>
-  </footer>
 </div>
+
+<footer>
+  <div class="wrap">
+    <p>Memex is building on the excellent <a href="https://github.com/NateBJones-Projects/OB1">Open Brain</a> project by Nate B. Jones, and on an earlier write-up, <a href="https://muzayan.substack.com/p/liberating-memory">Liberating memory</a>. Source and setup instructions are on <a class="repo-link" href="https://github.com/predsymod/memex">GitHub</a>.</p>
+  </div>
+</footer>
 
 <script>
   // Set the repository once. Every link and the copyable prompt below follow it.
