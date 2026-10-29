@@ -21,9 +21,13 @@ export function matchesAny(given: string | null | undefined, keys: string[]): bo
 // dropped rather than guessed at, so a typo can't turn into a key under a garbled name.
 export function parseClientKeys(raw: string | undefined): [string, string][] {
   const out: [string, string][] = [];
-  for (const p of (raw ?? "").split(",")) {
+  for (const [n, entry] of (raw ?? "").split(",").entries()) {
+    const p = entry.trim(); // a stray space or Windows line ending from an editor or .env must not become part of a key
+    if (!p) continue;
     const i = p.indexOf(":");
-    if (i > 0 && i < p.length - 1) out.push([p.slice(0, i), p.slice(i + 1)]);
+    const name = p.slice(0, i).trim(), key = p.slice(i + 1).trim();
+    if (i > 0 && name && key) out.push([name, key]);
+    else console.warn(`MCP_ACCESS_KEYS entry ${n + 1} ignored: expected name:key`); // never log the value itself
   }
   return out;
 }

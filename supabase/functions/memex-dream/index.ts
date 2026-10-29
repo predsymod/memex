@@ -7,6 +7,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { asTier, clean, maxTier, scanTier, type Tier } from "../_shared/sensitivity.ts";
 import { matchesAny, parseClientKeys } from "../_shared/auth.ts";
+import { embedText } from "../_shared/embed.ts";
 import { fetchAll, stripReservedTags } from "../_shared/guards.ts";
 
 const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
@@ -134,15 +135,9 @@ async function askJson(system: string, user: string, effort = REASONING_EFFORT):
   throw new Error(lastError);
 }
 
+// Null when embeddings are off or failing: overviews and digests are then saved unembedded and backfilled later.
 async function embed(text: string): Promise<number[] | null> {
-  const key = Deno.env.get("OPENROUTER_API_KEY");
-  if (!key) return null;
-  const res = await fetch("https://openrouter.ai/api/v1/embeddings", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ model: "openai/text-embedding-3-small", input: text }),
-  });
-  return res.ok ? (await res.json()).data[0].embedding : null;
+  try { return await embedText(Deno.env.get("OPENROUTER_API_KEY"), text, { retry: true }); } catch { return null; }
 }
 
 // Notes saved while embeddings were off or the provider was down have no embedding, so search by meaning can't find them.
@@ -286,7 +281,10 @@ async function connect(batch: Row[], run_id: string, log: Log): Promise<{ links:
     const { data: pair } = await supabase.from("thoughts").select("id,content,created_at,merged_into,source").in("id", [r.from_id, r.to_id]);
     if (pair?.length !== 2 || pair.some((p) => p.merged_into)) continue;
     // The model's verdict alone must not hide a note: only notes from the same source are merged.
-    if (pair[0].source !== pair[1].source) continue;
+    if (pair[0].source !== pair[1].source) {
+      await log({ run_id, thought_id: r.from_id, action: "merge_skipped", detail: { reason: "different sources", other: r.to_id } });
+      continue;
+    }
     const [older, newer] = pair.sort((a, b) => a.created_at.localeCompare(b.created_at));
     const keep = newer.content.length > older.content.length * 1.15 ? newer : older;
     const hide = keep === older ? newer : older;
@@ -494,12 +492,18 @@ async function synthesize(run_id: string, log: Log): Promise<{ counts: SynthCoun
 
 Deno.serve(async (req) => {
   if (!matchesAny(req.headers.get("x-brain-key"), ACCEPTED_KEYS)) return new Response("unauthorized", { status: 401 });
-  if (!PROVIDERS.length) return Response.json({ skipped: "Dreaming is not configured" });
+  if (!PROVIDERS.length) {
+    // No model to dream with, but a call can still heal notes that were saved without an embedding.
+    const bf = await backfillEmbeddings(crypto.randomUUID(), async () => {});
+    return Response.json({ skipped: "Dreaming is not configured", embedded: bf.embedded, unembedded: bf.missing });
+  }
   const url = new URL(req.url);
 
   // ?dry=1: enrich made-up thoughts and return the result with token usage and timing. Writes nothing.
   // ?effort=low tries a reasoning-effort setting for this call only.
   if (url.searchParams.get("dry") === "1") {
+    const effort = url.searchParams.get("effort");
+    if (effort && !EFFORTS.has(effort)) return Response.json({ error: `effort must be one of: ${[...EFFORTS].join(", ")}` }, { status: 400 });
     const sample = [
       { id: "a", content: "Decided to use Supabase for the memory store.", written: "2026-10-26" },
       { id: "b", content: "Dentist appointment next Friday at 3pm.", written: "2026-10-26" },
@@ -510,7 +514,7 @@ Deno.serve(async (req) => {
       const { json, provider, usage } = await askJson(
         ENRICH_PROMPT("2026-10-26"),
         sample.map((s) => wrap(s.id, s.content, ` written="${s.written}"`)).join("\n"),
-        EFFORTS.has(url.searchParams.get("effort") ?? "") ? url.searchParams.get("effort")! : REASONING_EFFORT,
+        effort ?? REASONING_EFFORT,
       );
       return Response.json({ provider, ms: Date.now() - t0, usage, results: json.results });
     } catch (e) {
@@ -532,10 +536,6 @@ Deno.serve(async (req) => {
   const forceSynth = url.searchParams.get("synthesize") === "1";
 
   try {
-    const bf = await backfillEmbeddings(run_id, log);
-    totals.embedded = bf.embedded;
-    totals.unembedded = bf.missing;
-
     // Restricted memories (secrets) are never sent to a model.
     const { data: rows } = await supabase.from("thoughts").select("id,content,tags,created_at,sensitivity_tier")
       .is("dreamed_at", null).is("merged_into", null).is("retracted_at", null).neq("source", "dream").neq("sensitivity_tier", "restricted")
@@ -567,6 +567,10 @@ Deno.serve(async (req) => {
       totals.tokens.output += s.usage.output;
     }
     if (totals.remaining === 0 && totals.processed) totals.digest = await digest(run_id, log);
+    // Last, so a slow or failing embeddings provider never holds up the real work.
+    const bf = await backfillEmbeddings(run_id, log);
+    totals.embedded = bf.embedded;
+    totals.unembedded = bf.missing;
     await flush();
   } catch (e) {
     await log({ run_id, action: "aborted", detail: { error: (e as Error).message } });

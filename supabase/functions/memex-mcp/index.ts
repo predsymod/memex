@@ -5,6 +5,7 @@ import { z } from "zod";
 import { createClient } from "@supabase/supabase-js";
 import { scanTier } from "../_shared/sensitivity.ts";
 import { parseClientKeys, timingSafeEqual } from "../_shared/auth.ts";
+import { embedText } from "../_shared/embed.ts";
 import { fetchAll, isReservedSource, stripReservedTags } from "../_shared/guards.ts";
 
 const supabase = createClient(
@@ -37,22 +38,8 @@ async function sha256(text: string): Promise<string> {
 }
 
 // OPENROUTER_API_KEY is optional: without it (or while the provider is down) notes are saved unembedded and search
-// falls back to keywords. A rate limit or server error is retried once before giving up.
-async function embed(text: string): Promise<number[]> {
-  if (!OPENROUTER_API_KEY) throw new Error("embedding failed: no OPENROUTER_API_KEY secret set");
-  const call = () => fetch("https://openrouter.ai/api/v1/embeddings", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${OPENROUTER_API_KEY}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ model: "openai/text-embedding-3-small", input: text }),
-  });
-  let res = await call();
-  if (res.status === 429 || res.status >= 500) {
-    await new Promise((r) => setTimeout(r, 500));
-    res = await call();
-  }
-  if (!res.ok) throw new Error(`embedding failed: ${res.status}${res.status === 401 ? " (check the OPENROUTER_API_KEY secret)" : ""}`);
-  return (await res.json()).data[0].embedding;
-}
+// falls back to keywords. Saves retry once after a rate limit or server error; search does not, and times out sooner.
+const embed = (text: string, opts?: { retry?: boolean; timeoutMs?: number }) => embedText(OPENROUTER_API_KEY, text, opts);
 
 // Input bounds: a valid key shouldn't be able to run up embedding costs or exhaust memory with one oversized call.
 const CONTENT = z.string().min(1).max(20_000);
@@ -122,7 +109,7 @@ async function insertThought(content: string, source: string, tags: string[] = [
   let embedError: string | null = null;
   if (sensitivity_tier !== "restricted") {
     if (precomputed) embedding = precomputed;
-    else try { embedding = await embed(content); } catch (e) { embedError = (e as Error).message; }
+    else try { embedding = await embed(content, { retry: true }); } catch (e) { embedError = (e as Error).message; }
   }
   const { data, error } = await supabase
     .from("thoughts")
@@ -191,7 +178,7 @@ function buildServer(client: string) {
     inputSchema: searchIn,
   }, async ({ query, limit, recency, half_life_days, tag, source, include_restricted }: z.infer<typeof searchIn>) => {
     // If the embedding provider is down, fall back to keyword-only search instead of failing.
-    const query_embedding = await embed(query).catch(() => null);
+    const query_embedding = await embed(query, { timeoutMs: 5_000 }).catch(() => null);
     // With a filter, over-fetch so enough results survive it.
     const { data, error } = await supabase.rpc("search_memex", {
       query_text: query, query_embedding, match_count: tag || source ? Math.min(50, limit * 5) : limit,
@@ -369,7 +356,7 @@ function buildServer(client: string) {
         // Repeat guard: skip what this agent already saved automatically, or what the user retracted. Corrections are exempt.
         if (!/^correction\b/i.test(item.content.trim())) {
           let embedding: number[];
-          try { embedding = await embed(item.content); } catch { skip("could_not_check_repeats"); continue; }
+          try { embedding = await embed(item.content, { retry: true }); } catch { skip("could_not_check_repeats"); continue; }
           const { data: m } = await supabase.rpc("autosync_match", { p_source: source, p_embedding: embedding, p_min: UNATTENDED_REPEAT_SIMILARITY });
           if (m?.length) { skip(m[0].retracted ? "previously_retracted" : "already_saved"); continue; }
           const r = await insertThought(item.content, source, tags, embedding);

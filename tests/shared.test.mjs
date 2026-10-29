@@ -16,6 +16,7 @@ check('parseClientKeys: named pairs', same(parseClientKeys('claude:k1,codex:k2')
 check('parseClientKeys: key may contain a colon', same(parseClientKeys('claude:a:b'), [['claude', 'a:b']]));
 check('parseClientKeys: drops entry with no colon', same(parseClientKeys('badentry,claude:k1'), [['claude', 'k1']]));
 check('parseClientKeys: drops empty name or empty key', same(parseClientKeys(':k1,claude:,,'), []));
+check('parseClientKeys: trims spaces and a Windows line ending', same(parseClientKeys('claude: k1\r\n,codex:k2 '), [['claude', 'k1'], ['codex', 'k2']]));
 check('parseClientKeys: unset', same(parseClientKeys(undefined), []));
 
 check('scanTier: ordinary note is standard', scanTier('Prefers dark mode and uses Railway for hosting') === 'standard');
@@ -38,6 +39,9 @@ check('stripReservedTags: drops server-only tags, keeps the rest', same(stripRes
 const rows = Array.from({ length: 2500 }, (_, i) => i);
 const paged = await fetchAll((a, b) => Promise.resolve({ data: rows.slice(a, b + 1) }));
 check('fetchAll: reads past the 1000-row cap', paged.length === 2500 && paged[2499] === 2499);
+let threw = false;
+try { await fetchAll(() => Promise.resolve({ data: null, error: { message: 'boom' } })); } catch { threw = true; }
+check('fetchAll: a failed page throws instead of returning a short list', threw);
 check('fetchAll: exact page boundary and empty result',
   (await fetchAll((a, b) => Promise.resolve({ data: rows.slice(0, 2000).slice(a, b + 1) }))).length === 2000 &&
   (await fetchAll(() => Promise.resolve({ data: null }))).length === 0);

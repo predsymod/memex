@@ -70,7 +70,7 @@ try {
   const stats = JSON.parse(await tool("thought_stats"));
   total = stats.total;
   note(true, "database reachable (thought_stats)", `${stats.total} memories`);
-  if (stats.unembedded > 0) note(null, "all memories are embedded", `${stats.unembedded} are not, so search by meaning cannot find them (fine if you chose keyword-only). Set OPENROUTER_API_KEY (or fix it); Dreaming embeds up to 50 per run once it works`);
+  if (stats.unembedded > 0) note(null, "all memories are embedded", `${stats.unembedded} are not, so search by meaning cannot find them (fine if you chose keyword-only). Set OPENROUTER_API_KEY (or fix it); each Dreaming run, or a manual call to the memex-dream function, then embeds up to 50 of them`);
 } catch (e) { note(false, "database reachable (thought_stats)", e.message + " (did the migrations run?)"); }
 
 try {
