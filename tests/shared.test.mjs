@@ -1,5 +1,6 @@
 // Unit tests for the pure helpers in supabase/functions/_shared. Node strips the TypeScript types itself.
 import { timingSafeEqual, matchesAny, parseClientKeys } from '../supabase/functions/_shared/auth.ts';
+import { isReservedSource, stripReservedTags, fetchAll } from '../supabase/functions/_shared/guards.ts';
 import { scanTier, maxTier, asTier, clean } from '../supabase/functions/_shared/sensitivity.ts';
 
 let pass = 0, fail = 0;
@@ -31,6 +32,15 @@ for (const [label, s] of [
 check('maxTier picks the stricter tier', maxTier('standard', 'personal') === 'personal' && maxTier('restricted', 'personal') === 'restricted');
 check('asTier: unknown values become standard', asTier('nonsense') === 'standard' && asTier('personal') === 'personal' && asTier(undefined) === 'standard');
 check('clean: strips control characters and caps length', clean('a\u0000b\u0007c', 10) === 'abc' && clean('abcdef', 3) === 'abc' && clean(null, 5) === '');
+
+check('isReservedSource: dream in any case or padding', isReservedSource('dream') && isReservedSource(' Dream ') && !isReservedSource('claude'));
+check('stripReservedTags: drops server-only tags, keeps the rest', same(stripReservedTags(['work', 'auto-sync', 'Synthesis', 'digest', 'sync-prefs']), ['work', 'sync-prefs']));
+const rows = Array.from({ length: 2500 }, (_, i) => i);
+const paged = await fetchAll((a, b) => Promise.resolve({ data: rows.slice(a, b + 1) }));
+check('fetchAll: reads past the 1000-row cap', paged.length === 2500 && paged[2499] === 2499);
+check('fetchAll: exact page boundary and empty result',
+  (await fetchAll((a, b) => Promise.resolve({ data: rows.slice(0, 2000).slice(a, b + 1) }))).length === 2000 &&
+  (await fetchAll(() => Promise.resolve({ data: null }))).length === 0);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
