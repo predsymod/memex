@@ -70,12 +70,13 @@ try {
   const stats = JSON.parse(await tool("thought_stats"));
   total = stats.total;
   note(true, "database reachable (thought_stats)", `${stats.total} memories`);
+  if (stats.unembedded > 0) note(null, "all memories are embedded", `${stats.unembedded} are not, so search by meaning cannot find them (fine if you chose keyword-only). Set OPENROUTER_API_KEY (or fix it); Dreaming embeds up to 50 per run once it works`);
 } catch (e) { note(false, "database reachable (thought_stats)", e.message + " (did the migrations run?)"); }
 
 try {
   const hits = JSON.parse(await tool("search_thoughts", { query: "memex doctor check", limit: 1 }));
   note(Array.isArray(hits), "search works", "the search function responds (if embeddings are down it falls back to keywords; the capture_thought check in SETUP.md step 9 confirms them)");
-} catch (e) { note(false, "search works", e.message + " (check OPENROUTER_API_KEY and migration 0005)"); }
+} catch (e) { note(false, "search works", e.message + " (check migration 0005; if embeddings are on, also OPENROUTER_API_KEY)"); }
 
 try {
   const dreamUrl = URL_MCP.replace(/\/memex-mcp$/, "/memex-dream") + "?dry=1";

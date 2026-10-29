@@ -6,14 +6,14 @@
 // Scheduled by pg_cron (see supabase/schedule-dreaming.sql). With no provider key configured it does nothing.
 import { createClient } from "@supabase/supabase-js";
 import { asTier, clean, maxTier, scanTier, type Tier } from "../_shared/sensitivity.ts";
-import { matchesAny } from "../_shared/auth.ts";
+import { matchesAny, parseClientKeys } from "../_shared/auth.ts";
 
 const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
 // The scheduler may call with any configured Memex key.
 const ACCEPTED_KEYS = [
   Deno.env.get("MCP_ACCESS_KEY"),
-  ...(Deno.env.get("MCP_ACCESS_KEYS") ?? "").split(",").map((p) => p.slice(p.indexOf(":") + 1)),
+  ...parseClientKeys(Deno.env.get("MCP_ACCESS_KEYS")).map(([, k]) => k),
 ].filter((k): k is string => !!k);
 
 // Providers are tried in DREAM_PROVIDERS order (default "meta,openrouter"); a provider with no key configured is
@@ -141,6 +141,29 @@ async function embed(text: string): Promise<number[] | null> {
     body: JSON.stringify({ model: "openai/text-embedding-3-small", input: text }),
   });
   return res.ok ? (await res.json()).data[0].embedding : null;
+}
+
+// Notes saved while embeddings were off or the provider was down have no embedding, so search by meaning can't find them.
+// Embed a few per run, oldest first, so adding OPENROUTER_API_KEY later (or recovering from an outage) heals the backlog.
+// Restricted notes are never embedded. Stops at the first failure, since the next one would fail the same way.
+const EMBED_BACKFILL_MAX = 50;
+async function backfillEmbeddings(run_id: string, log: Log): Promise<{ embedded: number; missing: number }> {
+  if (!Deno.env.get("OPENROUTER_API_KEY")) return { embedded: 0, missing: 0 };
+  const { data } = await supabase.from("thoughts").select("id,content").is("embedding", null)
+    .is("merged_into", null).is("retracted_at", null).neq("sensitivity_tier", "restricted")
+    .order("created_at").limit(EMBED_BACKFILL_MAX);
+  let embedded = 0;
+  for (const t of data ?? []) {
+    const e = await embed(t.content);
+    if (!e) break;
+    const { error } = await supabase.from("thoughts").update({ embedding: e }).eq("id", t.id).is("embedding", null);
+    if (error) break;
+    embedded++;
+  }
+  const { count } = await supabase.from("thoughts").select("id", { count: "exact", head: true }).is("embedding", null)
+    .is("merged_into", null).is("retracted_at", null).neq("sensitivity_tier", "restricted");
+  if (embedded) await log({ run_id, action: "embed_backfill", detail: { embedded } });
+  return { embedded, missing: count ?? 0 };
 }
 
 // ---------- phases ----------
@@ -496,13 +519,17 @@ Deno.serve(async (req) => {
   const log: Log = async (r) => { buffer.push(r); };
   const flush = async () => { if (buffer.length) await supabase.from("dream_log").insert(buffer.splice(0)); };
   const totals = {
-    processed: 0, links: 0, merged: 0, remaining: 0, digest: false, tokens: { input: 0, output: 0 }, ms: 0,
+    processed: 0, links: 0, merged: 0, remaining: 0, digest: false, embedded: 0, unembedded: 0, tokens: { input: 0, output: 0 }, ms: 0,
     synthesis: { created: 0, updated: 0, skipped: {} } as SynthCounts,
   };
   // ?synthesize=1 writes overviews even when nothing new was processed (for a manual run or the demo).
   const forceSynth = url.searchParams.get("synthesize") === "1";
 
   try {
+    const bf = await backfillEmbeddings(run_id, log);
+    totals.embedded = bf.embedded;
+    totals.unembedded = bf.missing;
+
     // Restricted memories (secrets) are never sent to a model.
     const { data: rows } = await supabase.from("thoughts").select("id,content,tags,created_at,sensitivity_tier")
       .is("dreamed_at", null).is("merged_into", null).is("retracted_at", null).neq("source", "dream").neq("sensitivity_tier", "restricted")

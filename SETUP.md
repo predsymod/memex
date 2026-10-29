@@ -16,7 +16,7 @@ Check that `git --version` and either `supabase --version` or `npx supabase --ve
 
 ## 2. Accounts (HUMAN)
 - A Supabase account and a new, empty project. Ask for the project ref (the id in the project URL). Free projects pause after about a week of inactivity. When creating the project, the defaults are fine; unchecking "Automatically expose new tables" is good hygiene (Memex locks its own tables down either way).
-- An OpenRouter account with a little credit, and an API key. It is used for embeddings (fractions of a cent per thousand thoughts).
+- Recommended: an OpenRouter account with a little credit, and an API key. It is used for embeddings (fractions of a cent per thousand thoughts), which is what lets search find notes by meaning. Without it Memex still works, but notes are saved unembedded and search is keyword-only; scheduled (unattended) saves are skipped because they need embeddings to check for repeats. Tell the user this trade-off and let them choose.
 - Optional, for Dreaming: a Meta Model API key from https://dev.meta.ai. Dreaming sends new memories to that provider, so tell the user this before enabling it.
 
 Have the user put secrets in the repo's gitignored `.env` themselves (copy `.env.example`), or type them into the Supabase dashboard under Edge Functions → Secrets. Do not ask them to paste secrets into the chat.
@@ -37,7 +37,7 @@ Verify: the `thoughts`, `thought_links`, `sync_cursors` and `dream_log` tables e
 Run `scripts/generate-key.sh` (or `scripts/generate-key.ps1` on Windows). Show it to the user once and tell them to save it in a password manager, and put it in `.env` as `MCP_ACCESS_KEY`.
 
 ## 6. Set secrets
-Have the user fill in `.env` (copy `.env.example`; it is git-ignored) with `MCP_ACCESS_KEY` and `OPENROUTER_API_KEY`. Every `NAME=` line in the file is sent as a secret, so a blank one becomes an empty secret: delete the lines you are not using (or leave them commented out). If the user later changes a secret in the dashboard, that is fine too; saving a new value under the same name replaces it. Then:
+Have the user fill in `.env` (copy `.env.example`; it is git-ignored) with `MCP_ACCESS_KEY` and, unless they chose to skip embeddings, `OPENROUTER_API_KEY`. Every `NAME=` line in the file is sent as a secret, so a blank one becomes an empty secret: delete the lines you are not using (or leave them commented out). If the user later changes a secret in the dashboard, that is fine too; saving a new value under the same name replaces it. Then:
 ```
 supabase secrets set --env-file .env
 ```
@@ -58,9 +58,10 @@ The server URL is `https://<PROJECT_REF>.supabase.co/functions/v1/memex-mcp`.
 - opencode: in `opencode.json`, `"mcp": {"memex": {"type": "remote", "url": "{env:MEMEX_URL}", "headers": {"x-brain-key": "{env:MEMEX_KEY}"}, "enabled": true}}`. The user sets `MEMEX_URL` and `MEMEX_KEY` in their own terminal and restarts opencode.
 - Clients that only take a URL (such as claude.ai custom connectors): use `<URL>?key=<KEY>` and set `ALLOW_URL_KEY=true` in step 6.
 - Give each tool its own copy of the key; there is no per-tool setup on the server.
+- Make agents search without being told. The server's instructions and the `search_thoughts` description already tell an agent to search Memex whenever an answer could depend on the user's past context, but some clients ignore server instructions. Offer to add one line to the agent's persistent instructions (`CLAUDE.md`, `AGENTS.md`, custom instructions): "I keep my personal context in Memex. Before answering anything that depends on my preferences, people, projects or past decisions, search it with search_thoughts." Add it only if the user agrees.
 
 ## 9. Verify
-Call `capture_thought` with "Memex setup test", then `search_thoughts` for "setup test". Both must succeed. (If `capture_thought` says `embedding failed: 401`, the `OPENROUTER_API_KEY` secret is missing or wrong. The doctor can't catch this, because search quietly falls back to keywords when embeddings are down.) Then delete the test thought, or tell the user it is safe to delete. Tell the user setup is done and that they can say "sync memex" in any agent (see SYNC.md).
+Call `capture_thought` with "Memex setup test", then `search_thoughts` for "setup test". Both must succeed. (If the result says `Saved without an embedding`, the `OPENROUTER_API_KEY` secret is missing or wrong, which is fine only if the user chose to skip embeddings. The doctor cannot catch this, because search quietly falls back to keywords when embeddings are down.) Then delete the test thought, or tell the user it is safe to delete. Tell the user setup is done and that they can say "sync memex" in any agent (see SYNC.md).
 
 ## 10. Optional: Dreaming
 A nightly job that tags, summarizes and connects memories. Skip it if the user has no Meta or OpenRouter key; Memex works without it.

@@ -16,3 +16,14 @@ export function matchesAny(given: string | null | undefined, keys: string[]): bo
   for (const k of keys) if (timingSafeEqual(given, k)) ok = true;
   return ok;
 }
+
+// Parses MCP_ACCESS_KEYS ("claude:key1,codex:key2") into [name, key] pairs. An entry without a name, a colon or a key is
+// dropped rather than guessed at, so a typo can't turn into a key under a garbled name.
+export function parseClientKeys(raw: string | undefined): [string, string][] {
+  const out: [string, string][] = [];
+  for (const p of (raw ?? "").split(",")) {
+    const i = p.indexOf(":");
+    if (i > 0 && i < p.length - 1) out.push([p.slice(0, i), p.slice(i + 1)]);
+  }
+  return out;
+}

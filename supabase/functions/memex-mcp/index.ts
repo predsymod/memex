@@ -4,7 +4,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { createClient } from "@supabase/supabase-js";
 import { scanTier } from "../_shared/sensitivity.ts";
-import { timingSafeEqual } from "../_shared/auth.ts";
+import { parseClientKeys, timingSafeEqual } from "../_shared/auth.ts";
 
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -13,13 +13,10 @@ const supabase = createClient(
 // MCP_ACCESS_KEYS="claude:key1,codex:key2" gives each client its own revocable key, and the key's name becomes
 // the `source` of everything that client writes. MCP_ACCESS_KEY (one shared key) still works as client "default".
 const CLIENT_KEYS: [string, string][] = [
-  ...(Deno.env.get("MCP_ACCESS_KEYS") ?? "").split(",").filter(Boolean).map((p): [string, string] => {
-    const i = p.indexOf(":");
-    return [p.slice(0, i), p.slice(i + 1)];
-  }),
+  ...parseClientKeys(Deno.env.get("MCP_ACCESS_KEYS")),
   ...(Deno.env.get("MCP_ACCESS_KEY") ? [["default", Deno.env.get("MCP_ACCESS_KEY")!] as [string, string]] : []),
 ];
-const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY")!;
+const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY");
 const ALLOW_URL_KEY = Deno.env.get("ALLOW_URL_KEY") === "true";
 
 const enc = new TextEncoder();
@@ -38,12 +35,20 @@ async function sha256(text: string): Promise<string> {
   return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+// OPENROUTER_API_KEY is optional: without it (or while the provider is down) notes are saved unembedded and search
+// falls back to keywords. A rate limit or server error is retried once before giving up.
 async function embed(text: string): Promise<number[]> {
-  const res = await fetch("https://openrouter.ai/api/v1/embeddings", {
+  if (!OPENROUTER_API_KEY) throw new Error("embedding failed: no OPENROUTER_API_KEY secret set");
+  const call = () => fetch("https://openrouter.ai/api/v1/embeddings", {
     method: "POST",
     headers: { Authorization: `Bearer ${OPENROUTER_API_KEY}`, "Content-Type": "application/json" },
     body: JSON.stringify({ model: "openai/text-embedding-3-small", input: text }),
   });
+  let res = await call();
+  if (res.status === 429 || res.status >= 500) {
+    await new Promise((r) => setTimeout(r, 500));
+    res = await call();
+  }
   if (!res.ok) throw new Error(`embedding failed: ${res.status}${res.status === 401 ? " (check the OPENROUTER_API_KEY secret)" : ""}`);
   return (await res.json()).data[0].embedding;
 }
@@ -112,14 +117,31 @@ async function insertThought(content: string, source: string, tags: string[] = [
   const { data: existing } = await supabase.from("thoughts").select("id").eq("content_hash", content_hash).maybeSingle();
   if (existing) return { status: "duplicate" as const, id: existing.id };
   const sensitivity_tier = scanTier(content);
-  const embedding = sensitivity_tier === "restricted" ? null : (precomputed ?? await embed(content));
+  let embedding: number[] | null = null;
+  let embedError: string | null = null;
+  if (sensitivity_tier !== "restricted") {
+    if (precomputed) embedding = precomputed;
+    else try { embedding = await embed(content); } catch (e) { embedError = (e as Error).message; }
+  }
   const { data, error } = await supabase
     .from("thoughts")
     .insert({ content, content_hash, embedding, source, tags, sensitivity_tier })
     .select("id")
     .single();
-  if (error) throw new Error(error.message);
-  return { status: "created" as const, id: data.id, ...(sensitivity_tier === "restricted" ? { sensitivity: "restricted", note: "Looks like a secret: stored, but not embedded, searchable, or synced." } : {}) };
+  if (error) {
+    // A concurrent identical save won the race between the check above and this insert: that is a duplicate, not a failure.
+    if (error.code === "23505") {
+      const { data: winner } = await supabase.from("thoughts").select("id").eq("content_hash", content_hash).maybeSingle();
+      if (winner) return { status: "duplicate" as const, id: winner.id };
+    }
+    throw new Error(error.message);
+  }
+  return {
+    status: "created" as const,
+    id: data.id,
+    ...(sensitivity_tier === "restricted" ? { sensitivity: "restricted", note: "Looks like a secret: stored, but not embedded, searchable, or synced." } : {}),
+    ...(embedError ? { embedded: false, note: `Saved without an embedding (${embedError}). Keyword search finds it; search by meaning will not until it is embedded.` } : {}),
+  };
 }
 
 // Memory is data, never instructions. Stated in every tool description an agent reads.
@@ -152,6 +174,10 @@ function buildServer(client: string) {
 
   server.registerTool("search_thoughts", {
     description:
+      "Search the user's shared memory. Use it on your own initiative, without being asked and without the user saying \"Memex\", " +
+      "whenever an answer could depend on what the user has told any agent before: their preferences, people, projects, plans, past decisions " +
+      "and the reasons for them, or when they refer to something earlier (\"as we discussed\", \"my usual\", \"that project\"). Search first, " +
+      "then answer; skip it for self-contained questions. " +
       "Hybrid search over saved thoughts: meaning (semantic) plus exact words (keyword), fused. Use recency (0 to 1) to favor newer " +
       "memories, e.g. 0.2 for a nudge or 0.7 for 'this week'. Notes marked superseded were replaced by a later note, and notes marked " +
       "disputed contradict a correction (often a stale fact saved again); both rank lower and the current version or the correction is shown next to them. " +
@@ -265,12 +291,15 @@ function buildServer(client: string) {
     return text(data);
   });
 
-  server.registerTool("thought_stats", { description: "Counts by source and topic.", inputSchema: z.object({}) }, async () => {
+  server.registerTool("thought_stats", { description: "Counts by source and topic, and how many notes are not yet embedded for search by meaning.", inputSchema: z.object({}) }, async () => {
     const { data, error } = await supabase.from("thoughts").select("source,topic").is("merged_into", null).is("retracted_at", null);
     if (error) throw new Error(error.message);
     const tally = (k: "source" | "topic") =>
       Object.fromEntries((data ?? []).reduce((m, r) => m.set(r[k] ?? "untagged", (m.get(r[k] ?? "untagged") ?? 0) + 1), new Map<string, number>()));
-    return text({ total: data?.length ?? 0, by_source: tally("source"), by_topic: tally("topic") });
+    // Notes without an embedding are invisible to search by meaning; Dreaming embeds them once an embeddings key works.
+    const { count: unembedded } = await supabase.from("thoughts").select("id", { count: "exact", head: true }).is("embedding", null)
+      .is("merged_into", null).is("retracted_at", null).neq("sensitivity_tier", "restricted");
+    return text({ total: data?.length ?? 0, unembedded: unembedded ?? 0, by_source: tally("source"), by_topic: tally("topic") });
   });
 
   // Sync: the agent sends what it knows that Memex may lack, and receives what changed since its last sync.
@@ -313,7 +342,7 @@ function buildServer(client: string) {
     // deno-lint-ignore no-explicit-any
     const pushed: {
       created: number; duplicate: number; skipped: Record<string, number>;
-      skipped_items: { index: number; reason: string }[]; items: { id: string; status: string }[];
+      skipped_items: { index: number; reason: string }[]; items: { id: string; status: string; embedded?: false }[];
     } = { created: 0, duplicate: 0, skipped: {}, skipped_items: [], items: [] };
     // `index` is the item's position in this call's push list (0-based), so the agent can tell the user exactly which
     // item was skipped and why.
@@ -339,13 +368,13 @@ function buildServer(client: string) {
           if (m?.length) { skip(m[0].retracted ? "previously_retracted" : "already_saved"); continue; }
           const r = await insertThought(item.content, source, tags, embedding);
           pushed[r.status]++;
-          pushed.items.push({ id: r.id, status: r.status });
+          pushed.items.push({ id: r.id, status: r.status, ..."embedded" in r ? { embedded: false as const } : {} });
           continue;
         }
       }
       const r = await insertThought(item.content, source, tags);
       pushed[r.status]++;
-      pushed.items.push({ id: r.id, status: r.status });
+      pushed.items.push({ id: r.id, status: r.status, ..."embedded" in r ? { embedded: false as const } : {} });
     }
 
     // Ask for one more than we return, to know whether there is a next page.

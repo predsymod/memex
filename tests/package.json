@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node migrations.test.mjs"
+    "test": "node shared.test.mjs && node migrations.test.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.12",
