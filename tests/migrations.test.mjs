@@ -175,6 +175,8 @@ console.log('\n=== B. Upgrade from the original Open Brain schema (what a live p
     check('old-server style insert still works (trigger supplies the hash)', ok);
     const m = await q(db, 'select * from match_thoughts($1::vector, 0.5, 5)', [vec(1)]);
     check('old match_thoughts still works untouched', m.length === 1 && m[0].content === 'Old note one');
+    const mp = await q(db, "select has_function_privilege('anon', 'match_thoughts(vector,float,int,jsonb)', 'execute') as a, has_function_privilege('authenticated', 'match_thoughts(vector,float,int,jsonb)', 'execute') as b");
+    check('anon and authenticated cannot execute the old match_thoughts (0007)', mp[0].a === false && mp[0].b === false);
     const s = await q(db, 'select * from search_memex($1, $2::vector, 5, 0.3)', ['note', vec(1)]);
     check('new hybrid search works on migrated data', s.length >= 1);
   }

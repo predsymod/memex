@@ -28,7 +28,7 @@ Clone this repo into a new folder and enter it.
 ```
 supabase login            # HUMAN: opens a browser
 supabase link --project-ref <PROJECT_REF>
-supabase db push --linked # applies every file in supabase/migrations in order (0001 to 0006 at the time of writing)
+supabase db push --linked # applies every file in supabase/migrations in order (0001 to 0007 at the time of writing)
 ```
 `db push` normally needs no database password, because the CLI signs in with a temporary role. If it does ask, the user sets or resets it in the dashboard (Project Settings → Database). The migrations are idempotent and safe to re-run.
 Verify: the `thoughts`, `thought_links`, `sync_cursors` and `dream_log` tables exist.
