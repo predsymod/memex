@@ -51,3 +51,5 @@ git config core.hooksPath .githooks     # turn on the secret scan before each co
 ## Credits
 
 Building on the excellent [Open Brain](https://github.com/NateBJones-Projects/OB1) project by Nate B. Jones, and on an earlier write-up, [Liberating memory](https://muzayan.substack.com/p/liberating-memory). No code from either is used here; the ideas are credited, and the implementation is new.
+
+The logo shapes (bookmark and sparkle) come from [Lucide](https://lucide.dev), ISC license.

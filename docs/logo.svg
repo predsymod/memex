@@ -1,10 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Memex">
-  <rect width="512" height="512" rx="112" fill="#2a3fd6"/>
-  <g transform="translate(0 -8)">
-    <rect x="130" y="110" width="270" height="200" rx="30" fill="#e9ecf8" opacity=".35"/>
-    <rect x="110" y="165" width="270" height="200" rx="30" fill="#e9ecf8" opacity=".65"/>
-    <rect x="132" y="215" width="270" height="200" rx="30" fill="#e9ecf8"/>
-    <rect x="172" y="275" width="120" height="22" rx="11" fill="#2a3fd6"/>
-    <rect x="172" y="320" width="190" height="22" rx="11" fill="#ffb400"/>
-  </g>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Memex" viewBox="0 0 512 512" width="512" height="512"><rect width="512" height="512" rx="112" fill="#2a3fd6"/><g transform="translate(86 86) scale(14.2)"><path fill="#e9ecf8" d="M17 3a2 2 0 0 1 2 2v15a1 1 0 0 1-1.496.868l-4.512-2.578a2 2 0 0 0-1.984 0l-4.512 2.578A1 1 0 0 1 5 20V5a2 2 0 0 1 2-2z"/><path fill="#ffb400" transform="translate(12 10.6) scale(.42) translate(-12 -12)" d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/></g></svg>
