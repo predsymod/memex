@@ -23,7 +23,7 @@ Early, and in daily use by its author across several agents. The setup was teste
 | Path | What it is |
 |---|---|
 | `SETUP.md`, `SYNC.md` | Instructions written for agents to follow |
-| `supabase/migrations` | Database schema, 6 idempotent migrations |
+| `supabase/migrations` | Database schema, 7 idempotent migrations |
 | `supabase/functions/memex-mcp` | The MCP server: capture, search, list, stats, sync, retract |
 | `supabase/functions/memex-dream` | The nightly Dreaming job |
 | `supabase/functions/_shared` | Secret detection and output cleaning used by both |
